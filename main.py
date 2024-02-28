@@ -1,7 +1,8 @@
 import tkinter
 import os
-from tkinter import *
+import re
 import customtkinter
+from tkinter import *
 from PIL import ImageTk, Image
 from ncclient import manager
 from xml.dom.minidom import parseString
@@ -125,11 +126,41 @@ class App(customtkinter.CTk):
         if self.ipaddress.get() == "" or self.port_select.get() == "" or self.username.get()=="" or self.password.get()=="":
             self.open_popup("ERROR","ERROR: Connection parameters cannot be empty!")
             return
+
+        if not self.is_ip_valid():
+            self.open_popup("ERROR","ERROR: IP Format invalid!")
+            return
+
+        if not self.is_port_valid():
+            self.open_popup("ERROR","Port must be in range 0-65535")
+            return
+            
         self.ipinuse = self.ipaddress.get()
         self.portinuse = self.port_select.get()
         self.usernameinuse = self.username.get()
         self.passwordinuse = self.password.get()
-    
+
+    def is_port_valid(self):
+        try:
+            port_num = int(self.port_select)
+            if 0 < port_num <= 65535:
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def is_ip_valid(self):
+        ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+        
+        if re.fullmatch(ip_pattern, self.ipaddress.get()):
+            octets = self.ipaddress.get().split('.')
+            for octet in octets:
+                if not (0 <= int(octet) <= 255):
+                    return False
+            return True
+        return False
+
     def is_empty_connection_parameters(self):
         if self.ipinuse == "" or self.portinuse == "" or self.usernameinuse=="" or self.passwordinuse=="":
             return True
