@@ -134,7 +134,7 @@ class App(customtkinter.CTk):
         if not self.is_port_valid():
             self.open_popup("ERROR","Port must be in range 0-65535")
             return
-            
+
         self.ipinuse = self.ipaddress.get()
         self.portinuse = self.port_select.get()
         self.usernameinuse = self.username.get()
@@ -142,7 +142,7 @@ class App(customtkinter.CTk):
 
     def is_port_valid(self):
         try:
-            port_num = int(self.port_select)
+            port_num = int(self.port_select.get())
             if 0 < port_num <= 65535:
                 return True
             else:
