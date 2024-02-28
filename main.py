@@ -175,14 +175,9 @@ class App(customtkinter.CTk):
 
                 if response.ok:
                     if(status=="Enable"):
-                        self.open_popup("SUCCESS","Profinet Enabled Succefully!")
-                    else:
-                        self.open_popup("SUCCESS","Profinet Disabled Succefully!")
-                else:
-                    if(status=="Enable"):
-                        self.open_popup("SUCCESS","Profinet Enable Failed!")
-                    else:
-                        self.open_popup("SUCCESS","Profinet Disable Failed!")
+                        self.open_popup("SUCCESS","Command Run Succesfully!")
+                else:    
+                    self.open_popup("ERROR", str(response))
         except Exception as err:
             self.open_popup("ERROR","Command failed! Check connection parameters.")
             print(err)
