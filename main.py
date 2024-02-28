@@ -3,6 +3,7 @@ import os
 import re
 import customtkinter
 from tkinter import *
+from tkinter import messagebox
 from PIL import ImageTk, Image
 from ncclient import manager
 from xml.dom.minidom import parseString
@@ -115,30 +116,25 @@ class App(customtkinter.CTk):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         customtkinter.set_widget_scaling(new_scaling_float)
 
-    def open_popup(self,popup_title, popup_message):
-        top=Toplevel(self)
-        top.geometry("750x250")
-        top.title(APP_TITLE+": "+popup_title)
-        Label(top, text= popup_message, font="Arial 20").place(x=80,y=80)
-    
     #CONNECTION PARAMETERS METHODS
     def save_connection_parameters(self):
         if self.ipaddress.get() == "" or self.port_select.get() == "" or self.username.get()=="" or self.password.get()=="":
-            self.open_popup("ERROR","ERROR: Connection parameters cannot be empty!")
+            messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
 
         if not self.is_ip_valid():
-            self.open_popup("ERROR","ERROR: IP Format invalid!")
+            messagebox.showerror(APP_TITLE, "ERROR: IP Format invalid!")            
             return
 
         if not self.is_port_valid():
-            self.open_popup("ERROR","Port must be in range 0-65535")
+            messagebox.showerror(APP_TITLE, "ERROR: Port must be in range 0-65535")            
             return
 
         self.ipinuse = self.ipaddress.get()
         self.portinuse = self.port_select.get()
         self.usernameinuse = self.username.get()
         self.passwordinuse = self.password.get()
+        messagebox.showinfo(APP_TITLE, "Connection parameters updated successfully!")
 
     def is_port_valid(self):
         try:
@@ -195,7 +191,7 @@ class App(customtkinter.CTk):
     #NETCONF COMMANDS METHODS
     def execute_netconf_command(self):
         if self.is_empty_connection_parameters():
-            self.open_popup("ERROR","ERROR: Connection parameters cannot be empty!")
+            messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
         try:
             with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
@@ -205,11 +201,11 @@ class App(customtkinter.CTk):
                 response = m.copy_config(source='running', target='startup')
 
                 if response.ok:
-                    self.open_popup("SUCCESS","Command Run Succesfully!")
-                else:    
-                    self.open_popup("ERROR", str(response))
+                    messagebox.showinfo(APP_TITLE, "Command Run Succesfully!")            
+                else:   
+                    messagebox.showerror(APP_TITLE, str(response))
         except Exception as err:
-            self.open_popup("ERROR","Command failed! Check connection parameters.")
+            messagebox.showerror(APP_TITLE,"Command failed! Check connection parameters.")
             print(err)
 
         
