@@ -174,8 +174,7 @@ class App(customtkinter.CTk):
                 response = m.copy_config(source='running', target='startup')
 
                 if response.ok:
-                    if(status=="Enable"):
-                        self.open_popup("SUCCESS","Command Run Succesfully!")
+                    self.open_popup("SUCCESS","Command Run Succesfully!")
                 else:    
                     self.open_popup("ERROR", str(response))
         except Exception as err:
