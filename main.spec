@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('disable-profinet.xml', '.'), ('enable-profinet.xml', '.'), ('logo.png', '.')],
+    datas=[('disable-profinet.xml', '.'), ('enable-profinet.xml', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

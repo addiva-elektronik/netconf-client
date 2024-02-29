@@ -3,10 +3,12 @@ import os
 import re
 import customtkinter
 from tkinter import *
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from PIL import ImageTk, Image
 from ncclient import manager
 from xml.dom.minidom import parseString
+from ncclient.xml_ import to_ele
+
 APP_TITLE="Simple NETCONF Client"
 customtkinter.set_appearance_mode("System") 
 customtkinter.set_default_color_theme("blue")
@@ -36,9 +38,43 @@ class App(customtkinter.CTk):
         self.grid_columnconfigure((2, 3), weight=0)
         self.grid_rowconfigure((0, 1, 2), weight=1)
 
+
+        menubar = Menu(self)
+        self.config(menu=menubar)
+
+        appearance_menu = Menu(menubar)
+        file_menu = Menu(menubar)    
+
+        appearance_submenu = Menu(appearance_menu)
+        appearance_submenu.add_command(label="Light", command = lambda: self.change_appearance_mode_event("Light"))
+        appearance_submenu.add_command(label="Dark", command = lambda: self.change_appearance_mode_event("Dark"))
+        appearance_submenu.add_command(label="System", command = lambda: self.change_appearance_mode_event("System"))
+        appearance_menu.add_cascade(label='Appearance Mode', menu=appearance_submenu, underline=0)
+
+        zoom_submenu = Menu(appearance_menu)
+        zoom_submenu.add_command(label="80%", command =  lambda: self.change_scaling_event("80%"))
+        zoom_submenu.add_command(label="90%", command = lambda: self.change_scaling_event("90%"))
+        zoom_submenu.add_command(label="100%", command = lambda: self.change_scaling_event("100%"))
+        zoom_submenu.add_command(label="110%", command = lambda: self.change_scaling_event("110%"))
+        zoom_submenu.add_command(label="120%", command = lambda: self.change_scaling_event("120%"))
+
+        appearance_menu.add_cascade(label='Zoom Level', menu=zoom_submenu, underline=0)
+        appearance_menu.add_separator()
+
+        file_menu.add_command(label="Import XML", underline=0, command=self.import_xml_file)
+        file_menu.add_separator()
+        file_menu.add_command(label="Export XML", underline=0, command=self.export_xml_file)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", underline=0, command=self.exit_app_func)
+        file_menu.add_separator()
+
+        menubar.add_cascade(label="File", underline=0, menu=file_menu)
+        menubar.add_cascade(label="Appearance", underline=0, menu=appearance_menu)
+
+
         # create sidebar frame with widgets
         self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=10, sticky="nsew")
+        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
         
         self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="NETCONF Client", font=customtkinter.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
@@ -50,23 +86,14 @@ class App(customtkinter.CTk):
         self.reboot_button.grid(row=2, column=0, padx=20, pady=10)
         
         self.profinet_label = customtkinter.CTkLabel(self.sidebar_frame, text="Profinet Status:", anchor="w")
-        self.profinet_label.grid(row=3, column=0, padx=20, pady=(10, 0))
+        self.profinet_label.grid(row=3, column=0, padx=20, pady=(30, 0))
         self.enable_profinet_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.profinet_status_func, values=["Enable","Disable"])
-        self.enable_profinet_button.grid(row=4, column=0, padx=20, pady=10)
+        self.enable_profinet_button.grid(row=4, column=0, padx=20, pady=0)
 
-        self.change_password_button = customtkinter.CTkButton(self.sidebar_frame, command=self.change_password_func, text="Change Password")
-        self.change_password_button.grid(row=5, column=0, padx=20, pady=10)
-
-        self.appearance_mode_label = customtkinter.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w")
-        self.appearance_mode_label.grid(row=6, column=0, padx=20, pady=(10, 0))
-        self.appearance_mode_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Light", "Dark", "System"],
-                                                                       command=self.change_appearance_mode_event)
-        self.appearance_mode_optionemenu.grid(row=7, column=0, padx=20, pady=(10, 10))
-        self.scaling_label = customtkinter.CTkLabel(self.sidebar_frame, text="Zoom:", anchor="w")
-        self.scaling_label.grid(row=8, column=0, padx=20, pady=(10, 0))
-        self.scaling_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["80%", "90%", "100%", "110%", "120%"],
-                                                               command=self.change_scaling_event)
-        self.scaling_optionemenu.grid(row=9, column=0, padx=20, pady=(10, 20))
+        self.getconfiguration_label = customtkinter.CTkLabel(self.sidebar_frame, text="Get configuration", anchor="w")
+        self.getconfiguration_label.grid(row=5, column=0, padx=20, pady=(30, 0))
+        self.getconfiguraiton_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.getconfiguration_func, values=["Running","Startup"])
+        self.getconfiguraiton_button.grid(row=6, column=0, padx=20, pady=0)
 
         self.execute_command_button = customtkinter.CTkButton(master=self, fg_color="transparent", text="Execute Command",border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
         self.execute_command_button.grid(row=3, column=3, padx=(20, 20), pady=(20, 20), sticky="nsew")
@@ -90,7 +117,7 @@ class App(customtkinter.CTk):
         self.port_select =  customtkinter.CTkEntry(master=self.connection_parameters_frame, placeholder_text="Port")
         self.port_select.grid(row=4, column=2, pady=10, padx=20, sticky="n")
         self.save_connection_parameters_button =  customtkinter.CTkButton(self.connection_parameters_frame, command=self.save_connection_parameters, text="Save Parameters")
-        self.save_connection_parameters_button.grid(row=5, column=2, pady=(200,0), padx=20, sticky="n")
+        self.save_connection_parameters_button.grid(row=9, column=2, pady=(10,0), padx=20, sticky="n")
         #default values for connection parameters
         self.username.delete(0,'end')
         self.username.insert(0,"admin")
@@ -98,9 +125,8 @@ class App(customtkinter.CTk):
         self.port_select.insert(0, "830")
 
         # set default values
-        self.appearance_mode_optionemenu.set("System")
         self.change_appearance_mode_event("System")
-        self.scaling_optionemenu.set("100%")
+        self.change_scaling_event("100%")
         self.textbox.delete(0.0,'end')
         self.textbox.insert("0.0", "XML Command Goes here!" )
 
@@ -115,6 +141,24 @@ class App(customtkinter.CTk):
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         customtkinter.set_widget_scaling(new_scaling_float)
+
+    def exit_app_func(self):
+        self.quit()
+
+    def import_xml_file(self):
+        files = [('XML File', '*.xml')]
+        file = filedialog.askopenfile(filetypes=files, defaultextension=files)  
+        if file is not None:
+            content = file.read()
+            self.textbox.delete(0.0,'end')
+            self.textbox.insert("0.0", content )
+
+    def export_xml_file(self):
+        files = [('XML File', '*.xml')]
+        file_path = filedialog.asksaveasfilename(filetypes=files, defaultextension=files)  
+        if file_path:
+            with open(file_path, "w") as xmlOutput:
+                xmlOutput.write(self.textbox.get('1.0', END))
 
     #CONNECTION PARAMETERS METHODS
     def save_connection_parameters(self):
@@ -175,24 +219,52 @@ class App(customtkinter.CTk):
         
         self.textbox.delete(0.0,'end')
         self.textbox.insert("0.0", xml_payload )
+    #GET CONFIGURATION METHOD    
+    def getconfiguration_func(self, conf_type):
+        if self.is_empty_connection_parameters():
+            messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
+            return
+        conf_type = str(conf_type).lower()
+        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+            fetch_res = m.get_config(source=conf_type)
+            dom = parseString(fetch_res.xml)
+            self.textbox.delete(0.0,'end')
+            self.textbox.insert("0.0", str(dom.toprettyxml()) )
         
-        
-    #FACTORY RESET METHODS
-    def factory_reset_func(self):
-        print("factory reset called")
-    
     #REBOOT METHODS
     def reboot_func(self):
-        print("reboot called")
+        self.textbox.delete(0.0,'end')
+        self.textbox.insert("0.0", """<system-restart xmlns="urn:ietf:params:xml:ns:yang:ietf-system"/>""" )
+    
+    def execute_reboot(self):
+        factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
+        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+            response = m.dispatch(factory_reset_rpc, source=None, filter=None)
 
-    #CHANGE PASSWORD METHODS
-    def change_password_func(self):
-        print("change password called")    
+    #FACTORY RESET METHODS
+    def factory_reset_func(self):
+        self.textbox.delete(0.0,'end')
+        self.textbox.insert("0.0", """<factory-reset xmlns="urn:ietf:params:xml:ns:yang:ietf-factory-default"/>""" )
+    
+    def execute_factory_reset(self):
+        factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
+        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+            response = m.dispatch(factory_reset_rpc, source=None, filter=None)
+
     #NETCONF COMMANDS METHODS
     def execute_netconf_command(self):
         if self.is_empty_connection_parameters():
             messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
+
+        if "<system-restart xmlns" in str(self.textbox.get("1.0", END)):
+            self.execute_reboot()
+            return
+        
+        if "<factory-reset xmlns" in str(self.textbox.get("1.0", END)):
+            self.execute_factory_reset()
+            return
+        
         try:
             with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
                 send_res = m.edit_config(target='running', config=self.textbox.get('1.0', END))
