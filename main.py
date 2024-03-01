@@ -8,6 +8,17 @@ from PIL import ImageTk, Image
 from ncclient import manager
 from xml.dom.minidom import parseString
 from ncclient.xml_ import to_ele
+from enum import Enum
+import datetime
+
+def get_current_time():
+    return datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
+
+class CommandType(Enum):
+    FACTORY_RESET = 0
+    REBOOT = 1
+    TIME_SET = 2
+    DEFAULT = 3
 
 APP_TITLE="Simple NETCONF Client"
 customtkinter.set_appearance_mode("System") 
@@ -74,7 +85,7 @@ class App(customtkinter.CTk):
 
         # create sidebar frame with widgets
         self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+        self.sidebar_frame.grid(row=0, column=0, rowspan=8, sticky="nsew")
         
         self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="NETCONF Client", font=customtkinter.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
@@ -85,22 +96,25 @@ class App(customtkinter.CTk):
         self.reboot_button = customtkinter.CTkButton(self.sidebar_frame, command=self.reboot_func, text="Reboot")
         self.reboot_button.grid(row=2, column=0, padx=20, pady=10)
         
+        self.time_set_button = customtkinter.CTkButton(self.sidebar_frame, command=self.time_set_func, text="Set System Time")
+        self.time_set_button.grid(row=3, column=0, padx=20, pady=10)
+
         self.profinet_label = customtkinter.CTkLabel(self.sidebar_frame, text="Profinet Status:", anchor="w")
-        self.profinet_label.grid(row=3, column=0, padx=20, pady=(30, 0))
+        self.profinet_label.grid(row=4, column=0, padx=20, pady=(30, 0))
         self.enable_profinet_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.profinet_status_func, values=["Enable","Disable"])
-        self.enable_profinet_button.grid(row=4, column=0, padx=20, pady=0)
+        self.enable_profinet_button.grid(row=5, column=0, padx=20, pady=0)
 
         self.getconfiguration_label = customtkinter.CTkLabel(self.sidebar_frame, text="Get configuration", anchor="w")
-        self.getconfiguration_label.grid(row=5, column=0, padx=20, pady=(30, 0))
+        self.getconfiguration_label.grid(row=6, column=0, padx=20, pady=(30, 0))
         self.getconfiguraiton_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.getconfiguration_func, values=["Running","Startup"])
-        self.getconfiguraiton_button.grid(row=6, column=0, padx=20, pady=0)
+        self.getconfiguraiton_button.grid(row=7, column=0, padx=20, pady=0)
 
-        self.execute_command_button = customtkinter.CTkButton(master=self, fg_color="transparent", text="Execute Command",border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
+        self.execute_command_button = customtkinter.CTkButton(master=self, fg_color="transparent", text="Send",border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
         self.execute_command_button.grid(row=3, column=3, padx=(20, 20), pady=(20, 20), sticky="nsew")
 
         # create textbox
         self.textbox = customtkinter.CTkTextbox(self, width=250)
-        self.textbox.grid(row=0, column=1, padx=(20, 0), pady=(20, 0), sticky="nsew")
+        self.textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 0), sticky="nsew")
 
         # create radiobutton frame
         self.connection_parameters_frame = customtkinter.CTkFrame(self)
@@ -219,6 +233,7 @@ class App(customtkinter.CTk):
         
         self.textbox.delete(0.0,'end')
         self.textbox.insert("0.0", xml_payload )
+
     #GET CONFIGURATION METHOD    
     def getconfiguration_func(self, conf_type):
         if self.is_empty_connection_parameters():
@@ -251,20 +266,44 @@ class App(customtkinter.CTk):
         with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
             response = m.dispatch(factory_reset_rpc, source=None, filter=None)
 
+    #TIME SETTING METHODS
+    def time_set_func(self):
+        self.textbox.delete(0.0,'end')
+        self.textbox.insert("0.0", """<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+                                <current-datetime>"""+get_current_time()+"""</current-datetime>
+                            </set-current-datetime>""" )
+    def execute_time_set(self):
+        factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
+        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+            response = m.dispatch(factory_reset_rpc, source=None, filter=None)
+
     #NETCONF COMMANDS METHODS
+    def get_type_of_command(self):
+        if "<system-restart xmlns" in str(self.textbox.get("1.0", END)):
+            return CommandType.REBOOT.value
+        if "<factory-reset xmlns" in str(self.textbox.get("1.0", END)):
+            return CommandType.FACTORY_RESET.value
+        if "<set-current-datetime xmlns" in str(self.textbox.get("1.0", END)):
+            return CommandType.TIME_SET.value
+        return CommandType.DEFAULT.value
+
     def execute_netconf_command(self):
         if self.is_empty_connection_parameters():
             messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
 
-        if "<system-restart xmlns" in str(self.textbox.get("1.0", END)):
+        if self.get_type_of_command() == CommandType.REBOOT.value:
             self.execute_reboot()
             return
         
-        if "<factory-reset xmlns" in str(self.textbox.get("1.0", END)):
+        if self.get_type_of_command() == CommandType.FACTORY_RESET.value:
             self.execute_factory_reset()
             return
         
+        if self.get_type_of_command() == CommandType.TIME_SET.value:
+            self.execute_time_set()
+            return
+
         try:
             with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
                 send_res = m.edit_config(target='running', config=self.textbox.get('1.0', END))
