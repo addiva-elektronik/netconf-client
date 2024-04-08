@@ -1,0 +1,5 @@
+customtkinter==5.2.2
+lxml==5.1.0
+ncclient==0.6.15
+pillow==10.2.0
+tk==0.1.0
