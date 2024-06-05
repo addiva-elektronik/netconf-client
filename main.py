@@ -1,6 +1,7 @@
 import tkinter
 import os
 import re
+import json
 import customtkinter
 from tkinter import *
 from tkinter import messagebox, filedialog
@@ -33,12 +34,35 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+class ConfigManager:
+    def __init__(self, filename='.netconf_config.json'):
+        self.filename = filename
+        self.filepath = self._get_file()
+        self.cfg = {
+            'addr': '',
+            'port': 830,
+            'user': 'admin',
+            'pass': ''
+        }
+        self.load()
+
+    def _get_file(self):
+        home_dir = os.path.expanduser('~')
+        return os.path.join(home_dir, self.filename)
+
+    def save(self):
+        with open(self.filepath, 'w') as file:
+            json.dump(self.cfg, file)
+
+    def load(self):
+        if os.path.exists(self.filepath):
+            with open(self.filepath, 'r') as file:
+                self.cfg = json.load(file)
+
 class App(customtkinter.CTk):
     def __init__(self):
-        self.ipinuse=""
-        self.portinuse=""
-        self.passwordinuse=""
-        self.usernameinuse=""
+        self.cfg_mgr = ConfigManager()
+        self.cfg = self.cfg_mgr.cfg
         super().__init__()
 
         self.title(APP_TITLE)
@@ -122,21 +146,25 @@ class App(customtkinter.CTk):
         self.radio_var = tkinter.IntVar(value=0)
         self.label_radio_group = customtkinter.CTkLabel(master=self.connection_parameters_frame, text="Connection Parameters:")
         self.label_radio_group.grid(row=0, column=2, columnspan=1, padx=10, pady=10, sticky="", )
-        self.ipaddress= customtkinter.CTkEntry(master=self.connection_parameters_frame,placeholder_text="127.0.0.1")
-        self.ipaddress.grid(row=1, column=2, pady=10, padx=20, sticky="n")
-        self.username = customtkinter.CTkEntry(master=self.connection_parameters_frame, placeholder_text="Username")
+        self.address = customtkinter.CTkEntry(self.connection_parameters_frame, placeholder_text="Device Address")
+        if self.cfg['addr']:
+            self.address.insert(0, self.cfg['addr'])
+        self.address.grid(row=1, column=2, pady=10, padx=20, sticky="n")
+        self.username = customtkinter.CTkEntry(self.connection_parameters_frame)
+        if self.cfg['user']:
+            self.username.insert(0, self.cfg['user'])
         self.username.grid(row=2, column=2, pady=10, padx=20, sticky="n")
-        self.password = customtkinter.CTkEntry(master=self.connection_parameters_frame, placeholder_text="Password", show="*")
+        self.password = customtkinter.CTkEntry(self.connection_parameters_frame, placeholder_text="Password", show="*")
+        if self.cfg['pass']:
+            self.password.insert(0, self.cfg['pass'])
         self.password.grid(row=3, column=2, pady=10, padx=20, sticky="n")
-        self.port_select =  customtkinter.CTkEntry(master=self.connection_parameters_frame, placeholder_text="Port")
+        self.port_select = customtkinter.CTkEntry(self.connection_parameters_frame)
         self.port_select.grid(row=4, column=2, pady=10, padx=20, sticky="n")
+        if self.cfg['port']:
+            self.port_select.insert(0, self.cfg['port'])
+
         self.save_connection_parameters_button =  customtkinter.CTkButton(self.connection_parameters_frame, command=self.save_connection_parameters, text="Save Parameters")
         self.save_connection_parameters_button.grid(row=9, column=2, pady=(10,0), padx=20, sticky="n")
-        #default values for connection parameters
-        self.username.delete(0,'end')
-        self.username.insert(0,"admin")
-        self.port_select.delete(0, 'end')
-        self.port_select.insert(0, "830")
 
         # set default values
         self.change_appearance_mode_event("System")
@@ -176,7 +204,7 @@ class App(customtkinter.CTk):
 
     #CONNECTION PARAMETERS METHODS
     def save_connection_parameters(self):
-        if self.ipaddress.get() == "" or self.port_select.get() == "" or self.username.get()=="" or self.password.get()=="":
+        if self.address.get() == "" or self.port_select.get() == "" or self.username.get()=="" or self.password.get()=="":
             messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
 
@@ -188,10 +216,12 @@ class App(customtkinter.CTk):
             messagebox.showerror(APP_TITLE, "ERROR: Port must be in range 0-65535")            
             return
 
-        self.ipinuse = self.ipaddress.get()
-        self.portinuse = self.port_select.get()
-        self.usernameinuse = self.username.get()
-        self.passwordinuse = self.password.get()
+        self.cfg['addr'] = self.address.get()
+        self.cfg['port'] = self.port_select.get()
+        self.cfg['user'] = self.username.get()
+        self.cfg['pass'] = self.password.get()
+        self.cfg_mgr.save()
+
         messagebox.showinfo(APP_TITLE, "Connection parameters updated successfully!")
 
     def is_port_valid(self):
@@ -207,8 +237,8 @@ class App(customtkinter.CTk):
     def is_ip_valid(self):
         ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
         
-        if re.fullmatch(ip_pattern, self.ipaddress.get()):
-            octets = self.ipaddress.get().split('.')
+        if re.fullmatch(ip_pattern, self.address.get()):
+            octets = self.address.get().split('.')
             for octet in octets:
                 if not (0 <= int(octet) <= 255):
                     return False
@@ -216,7 +246,7 @@ class App(customtkinter.CTk):
         return False
 
     def is_empty_connection_parameters(self):
-        if self.ipinuse == "" or self.portinuse == "" or self.usernameinuse=="" or self.passwordinuse=="":
+        if self.cfg['addr'] == "" or self.cfg['port'] == "" or self.cfg['user']=="" or self.cfg['pass']=="":
             return True
         return False
 
@@ -240,7 +270,7 @@ class App(customtkinter.CTk):
             messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
         conf_type = str(conf_type).lower()
-        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+        with manager.connect_ssh(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
             fetch_res = m.get_config(source=conf_type)
             dom = parseString(fetch_res.xml)
             self.textbox.delete(0.0,'end')
@@ -253,7 +283,7 @@ class App(customtkinter.CTk):
     
     def execute_reboot(self):
         factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
-        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+        with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
             response = m.dispatch(factory_reset_rpc, source=None, filter=None)
 
     #FACTORY RESET METHODS
@@ -263,7 +293,7 @@ class App(customtkinter.CTk):
     
     def execute_factory_reset(self):
         factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
-        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+        with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
             response = m.dispatch(factory_reset_rpc, source=None, filter=None)
 
     #TIME SETTING METHODS
@@ -274,7 +304,7 @@ class App(customtkinter.CTk):
                             </set-current-datetime>""" )
     def execute_time_set(self):
         factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
-        with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+        with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
             response = m.dispatch(factory_reset_rpc, source=None, filter=None)
 
     #NETCONF COMMANDS METHODS
@@ -305,7 +335,7 @@ class App(customtkinter.CTk):
             return
 
         try:
-            with manager.connect(host=self.ipinuse, port=self.portinuse, username=self.usernameinuse, password=self.passwordinuse, hostkey_verify=False) as m:
+            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
                 send_res = m.edit_config(target='running', config=self.textbox.get('1.0', END))
                 dom = parseString(send_res.xml)
                 print(dom.toprettyxml())
