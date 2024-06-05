@@ -140,6 +140,10 @@ class App(customtkinter.CTk):
         self.textbox = customtkinter.CTkTextbox(self, width=250)
         self.textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 0), sticky="nsew")
 
+        self.status_label = customtkinter.CTkLabel(self, anchor="w")
+        self.status_label.grid(row=3, column=1, columnspan=2, padx=(20, 0), pady=(0, 0), sticky="we")
+        self.status("Ready")
+
         # create radiobutton frame
         self.connection_parameters_frame = customtkinter.CTkFrame(self)
         self.connection_parameters_frame.grid(row=0, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
@@ -173,6 +177,20 @@ class App(customtkinter.CTk):
         self.textbox.insert("0.0", "XML Command Goes here!" )
 
     #UI METHODS
+    def _update_status(self, message, error=False):
+        if error:
+            self.status_label.configure(text=f"Error: {message}",
+                                        text_color=("#FF0000", "#FF4C4C"))
+        else:
+            self.status_label.configure(text=f"Status: {message}",
+                                        text_color=("#000000", "#FFFFFF"))
+
+    def status(self, message):
+        self._update_status(message, error=False)
+
+    def error(self, message):
+        self._update_status(message, error=True)
+
     def open_input_dialog_event(self):
         dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
         print("CTkInputDialog:", dialog.get_input())
@@ -205,11 +223,11 @@ class App(customtkinter.CTk):
     #CONNECTION PARAMETERS METHODS
     def save_connection_parameters(self):
         if self.address.get() == "" or self.port_select.get() == "" or self.username.get()=="" or self.password.get()=="":
-            messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
+            self.error("Connection parameters cannot be empty!")
             return
 
         if not self.is_port_valid():
-            messagebox.showerror(APP_TITLE, "ERROR: Port must be in range 0-65535")            
+            self.error("Port must be in range 0-65535")
             return
 
         self.cfg['addr'] = self.address.get()
@@ -218,7 +236,7 @@ class App(customtkinter.CTk):
         self.cfg['pass'] = self.password.get()
         self.cfg_mgr.save()
 
-        messagebox.showinfo(APP_TITLE, "Connection parameters updated successfully!")
+        self.status("Connection parameters updated.")
 
     def is_port_valid(self):
         try:
@@ -252,7 +270,7 @@ class App(customtkinter.CTk):
     #GET CONFIGURATION METHOD    
     def getconfiguration_func(self, conf_type):
         if self.is_empty_connection_parameters():
-            messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
+            self.error("Connection parameters cannot be empty!")
             return
         conf_type = str(conf_type).lower()
         with manager.connect_ssh(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
@@ -304,7 +322,7 @@ class App(customtkinter.CTk):
 
     def execute_netconf_command(self):
         if self.is_empty_connection_parameters():
-            messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
+            self.error("Connection parameters cannot be empty!")
             return
 
         if self.get_type_of_command() == CommandType.REBOOT.value:
@@ -327,14 +345,13 @@ class App(customtkinter.CTk):
                 response = m.copy_config(source='running', target='startup')
 
                 if response.ok:
-                    messagebox.showinfo(APP_TITLE, "Command Run Succesfully!")            
-                else:   
-                    messagebox.showerror(APP_TITLE, str(response))
+                    self.status("Command run successfully!")
+                else:
+                    self.error(str(response))
         except Exception as err:
-            messagebox.showerror(APP_TITLE,"Command failed! Check connection parameters.")
+            self.error("Command failed! Check connection parameters.")
             print(err)
 
-        
 
 if __name__ == "__main__":
     app = App()
