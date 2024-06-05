@@ -272,22 +272,31 @@ class App(customtkinter.CTk):
         if self.is_empty_connection_parameters():
             self.error("Connection parameters cannot be empty!")
             return
-        conf_type = str(conf_type).lower()
-        with manager.connect_ssh(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
-            fetch_res = m.get_config(source=conf_type)
-            dom = parseString(fetch_res.xml)
-            self.textbox.delete(0.0,'end')
-            self.textbox.insert("0.0", str(dom.toprettyxml()) )
-        
+        try:
+            conf_type = str(conf_type).lower()
+            print(f"Connecting to {self.cfg['addr']} port {self.cfg['port']} user {self.cfg['user']} pass {self.cfg['pass']}")
+            with manager.connect_ssh(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+                fetch_res = m.get_config(source=conf_type)
+                dom = parseString(fetch_res.xml)
+                self.textbox.delete(0.0,'end')
+                self.textbox.insert("0.0", str(dom.toprettyxml()) )
+        except Exception as err:
+            self.error(f"Failed fetching configuration: {err}")
+            print(err)
+
     #REBOOT METHODS
     def reboot_func(self):
         self.textbox.delete(0.0,'end')
         self.textbox.insert("0.0", """<system-restart xmlns="urn:ietf:params:xml:ns:yang:ietf-system"/>""" )
     
     def execute_reboot(self):
-        factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
-        with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
-            response = m.dispatch(factory_reset_rpc, source=None, filter=None)
+        rpc = to_ele(self.textbox.get("1.0", END))
+        try:
+            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+                response = m.dispatch(rpc, source=None, filter=None)
+        except Exception as err:
+            self.error(f"Failed reboot: {err}")
+            print(err)
 
     #FACTORY RESET METHODS
     def factory_reset_func(self):
@@ -295,9 +304,13 @@ class App(customtkinter.CTk):
         self.textbox.insert("0.0", """<factory-reset xmlns="urn:ietf:params:xml:ns:yang:ietf-factory-default"/>""" )
     
     def execute_factory_reset(self):
-        factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
-        with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
-            response = m.dispatch(factory_reset_rpc, source=None, filter=None)
+        try:
+            rpc = to_ele(self.textbox.get("1.0", END))
+            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+                response = m.dispatch(rpc, source=None, filter=None)
+        except Exception as err:
+            self.error(f"Failed factory reset: {err}")
+            print(err)
 
     #TIME SETTING METHODS
     def time_set_func(self):
@@ -306,9 +319,13 @@ class App(customtkinter.CTk):
                                 <current-datetime>"""+get_current_time()+"""</current-datetime>
                             </set-current-datetime>""" )
     def execute_time_set(self):
-        factory_reset_rpc = to_ele(self.textbox.get("1.0", END))
-        with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
-            response = m.dispatch(factory_reset_rpc, source=None, filter=None)
+        try:
+            rpc = to_ele(self.textbox.get("1.0", END))
+            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+                response = m.dispatch(rpc, source=None, filter=None)
+        except Exception as err:
+            self.error(f"Failed setting time: {err}")
+            print(err)
 
     #NETCONF COMMANDS METHODS
     def get_type_of_command(self):
