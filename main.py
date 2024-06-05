@@ -7,6 +7,7 @@ from tkinter import *
 from tkinter import messagebox, filedialog
 from PIL import ImageTk, Image
 from ncclient import manager
+from ncclient.transport.errors import AuthenticationError, SSHError
 from xml.dom.minidom import parseString
 from ncclient.xml_ import to_ele
 from enum import Enum
@@ -58,6 +59,36 @@ class ConfigManager:
         if os.path.exists(self.filepath):
             with open(self.filepath, 'r') as file:
                 self.cfg = json.load(file)
+
+class NetconfConnection:
+    def __init__(self, cfg, app):
+        self.cfg = cfg
+        self.app = app
+        self.manager = None
+
+    def __enter__(self):
+        try:
+            self.manager = manager.connect(host=self.cfg['addr'],
+                                           port=self.cfg['port'],
+                                           username=self.cfg['user'],
+                                           password=self.cfg['pass'],
+                                           hostkey_verify=False,
+                                           allow_agent=False,
+                                           timeout=30)
+            self.app.status("Connected to NETCONF server")
+            return self.manager
+        except AuthenticationError as err:
+            self.app.error(f"Authentication failed: {err}")
+        except SSHError as err:
+            self.app.error(f"SSH connection failed: {err}")
+        except Exception as err:
+            self.app.error(f"An unexpected error occurred: {err}")
+            raise err
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.manager is not None:
+            self.manager.close_session()
+            self.app.status("Disconnected from NETCONF server")
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -273,16 +304,18 @@ class App(customtkinter.CTk):
         if self.is_empty_connection_parameters():
             self.error("Connection parameters cannot be empty!")
             return
-        try:
-            conf_type = str(conf_type).lower()
-            print(f"Connecting to {self.cfg['addr']} port {self.cfg['port']} user {self.cfg['user']} pass {self.cfg['pass']}")
-            with manager.connect_ssh(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
+                conf_type = str(conf_type).lower()
                 fetch_res = m.get_config(source=conf_type)
                 dom = parseString(fetch_res.xml)
                 self.show(str(dom.toprettyxml()))
-        except Exception as err:
-            self.error(f"Failed fetching configuration: {err}")
-            print(err)
+            except Exception as err:
+                self.error(f"Failed fetching configuration: {err}")
+                print(err)
 
     #REBOOT METHODS
     def reboot_func(self):
@@ -290,25 +323,31 @@ class App(customtkinter.CTk):
     
     def execute_reboot(self):
         rpc = to_ele(self.textbox.get("1.0", END))
-        try:
-            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
                 response = m.dispatch(rpc, source=None, filter=None)
-        except Exception as err:
-            self.error(f"Failed reboot: {err}")
-            print(err)
+                self.show(response)
+            except Exception as err:
+                self.error(f"Failed reboot: {err}")
+                print(err)
 
     #FACTORY RESET METHODS
     def factory_reset_func(self):
         self.show("""<factory-reset xmlns="urn:ietf:params:xml:ns:yang:ietf-factory-default"/>""" )
     
     def execute_factory_reset(self):
-        try:
-            rpc = to_ele(self.textbox.get("1.0", END))
-            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
+                rpc = to_ele(self.textbox.get("1.0", END))
                 response = m.dispatch(rpc, source=None, filter=None)
-        except Exception as err:
-            self.error(f"Failed factory reset: {err}")
-            print(err)
+                self.show(response)
+            except Exception as err:
+                self.error(f"Failed factory reset: {err}")
+                print(err)
 
     #TIME SETTING METHODS
     def time_set_func(self):
@@ -317,13 +356,16 @@ class App(customtkinter.CTk):
 </set-current-datetime>""")
 
     def execute_time_set(self):
-        try:
-            rpc = to_ele(self.textbox.get("1.0", END))
-            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
+                rpc = to_ele(self.textbox.get("1.0", END))
                 response = m.dispatch(rpc, source=None, filter=None)
-        except Exception as err:
-            self.error(f"Failed setting time: {err}")
-            print(err)
+                self.show(response)
+            except Exception as err:
+                self.error(f"{err}")
+                print(err)
 
     #NETCONF COMMANDS METHODS
     def get_type_of_command(self):
@@ -352,8 +394,10 @@ class App(customtkinter.CTk):
             self.execute_time_set()
             return
 
-        try:
-            with manager.connect(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
                 send_res = m.edit_config(target='running', config=self.textbox.get('1.0', END))
                 dom = parseString(send_res.xml)
                 print(dom.toprettyxml())
@@ -363,9 +407,9 @@ class App(customtkinter.CTk):
                     self.status("Command run successfully!")
                 else:
                     self.error(str(response))
-        except Exception as err:
-            self.error("Command failed! Check connection parameters.")
-            print(err)
+            except Exception as err:
+                self.error("Command failed! Check connection parameters.")
+                print(err)
 
 
 if __name__ == "__main__":
