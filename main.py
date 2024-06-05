@@ -191,6 +191,10 @@ class App(customtkinter.CTk):
     def error(self, message):
         self._update_status(message, error=True)
 
+    def show(self, text):
+        self.textbox.delete(0.0, 'end')
+        self.textbox.insert("0.0", text)
+
     def open_input_dialog_event(self):
         dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
         print("CTkInputDialog:", dialog.get_input())
@@ -210,8 +214,7 @@ class App(customtkinter.CTk):
         file = filedialog.askopenfile(filetypes=files, defaultextension=files)  
         if file is not None:
             content = file.read()
-            self.textbox.delete(0.0,'end')
-            self.textbox.insert("0.0", content )
+            self.show(content)
 
     def export_xml_file(self):
         files = [('XML File', '*.xml')]
@@ -255,17 +258,15 @@ class App(customtkinter.CTk):
 
     #PROFINET STATUS METHODS
     def profinet_status_func(self, status):
-        xml_path =""
-        if(status=="Enable"):
+        xml_path = ""
+        if status == "Enable":
             xml_path = resource_path("enable-profinet.xml")
         else:
             xml_path = resource_path("disable-profinet.xml")
 
         with open(xml_path, 'r') as file:
             xml_payload = file.read()
-        
-        self.textbox.delete(0.0,'end')
-        self.textbox.insert("0.0", xml_payload )
+        self.show(xml_payload)
 
     #GET CONFIGURATION METHOD    
     def getconfiguration_func(self, conf_type):
@@ -278,16 +279,14 @@ class App(customtkinter.CTk):
             with manager.connect_ssh(host=self.cfg['addr'], port=self.cfg['port'], username=self.cfg['user'], password=self.cfg['pass'], hostkey_verify=False) as m:
                 fetch_res = m.get_config(source=conf_type)
                 dom = parseString(fetch_res.xml)
-                self.textbox.delete(0.0,'end')
-                self.textbox.insert("0.0", str(dom.toprettyxml()) )
+                self.show(str(dom.toprettyxml()))
         except Exception as err:
             self.error(f"Failed fetching configuration: {err}")
             print(err)
 
     #REBOOT METHODS
     def reboot_func(self):
-        self.textbox.delete(0.0,'end')
-        self.textbox.insert("0.0", """<system-restart xmlns="urn:ietf:params:xml:ns:yang:ietf-system"/>""" )
+        self.show("""<system-restart xmlns="urn:ietf:params:xml:ns:yang:ietf-system"/>""")
     
     def execute_reboot(self):
         rpc = to_ele(self.textbox.get("1.0", END))
@@ -300,8 +299,7 @@ class App(customtkinter.CTk):
 
     #FACTORY RESET METHODS
     def factory_reset_func(self):
-        self.textbox.delete(0.0,'end')
-        self.textbox.insert("0.0", """<factory-reset xmlns="urn:ietf:params:xml:ns:yang:ietf-factory-default"/>""" )
+        self.show("""<factory-reset xmlns="urn:ietf:params:xml:ns:yang:ietf-factory-default"/>""" )
     
     def execute_factory_reset(self):
         try:
@@ -314,9 +312,7 @@ class App(customtkinter.CTk):
 
     #TIME SETTING METHODS
     def time_set_func(self):
-        self.textbox.delete(0.0,'end')
-        self.textbox.insert("0.0", f"""
-<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+        self.show(f"""<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
     <current-datetime>{get_current_time()}</current-datetime>
 </set-current-datetime>""")
 
