@@ -1,6 +1,8 @@
 # Simple NETCONF Client 
 
-This application is a NETCONF client with a user-friendly UI, built with Python and customtkinter library, for interacting with NETCONF-enabled devices.
+This application is a NETCONF client with a user-friendly UI, built with
+Python and customtkinter library, for interacting with NETCONF-enabled
+devices.
 
 ## Cloning
 
@@ -18,14 +20,28 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install foobar.
 pip install requirments.txt
 ```
 
-#### IMPORTANT: Add files named "disable-profinet.xml", "enable-profinet.xml", etc to root folder. These files should contain your Netconf commands.
+> When done, call `deactivate` to "detach" from the venv.
+
+#### IMPORTANT INFORMATION!
+
+The program has pre-programmed buttons to enable/disable PROFINET.  This
+requires two custom files to be added to the root folder:
+
+ - `enable-profinet.xml`
+ - `disable-profinet.xml`
+
+These files should contain the NETCONF xml configuration to enable and
+disable PROFINET on the target device.
 
 ## Running and Building
+
 Application can be run on Windows, Linux & MacOS.
+
 ### Running app
 ``` 
-py ./main.py
+~/src/netconf-client(main)$ python main.py
 ```
+
 ### Building .exe for Windows
 ``` 
 pyinstaller --onefile --windowed --add-data "disable-profinet.xml:." --add-data "enable-profinet.xml:." main.py
