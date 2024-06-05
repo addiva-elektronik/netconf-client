@@ -315,9 +315,11 @@ class App(customtkinter.CTk):
     #TIME SETTING METHODS
     def time_set_func(self):
         self.textbox.delete(0.0,'end')
-        self.textbox.insert("0.0", """<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
-                                <current-datetime>"""+get_current_time()+"""</current-datetime>
-                            </set-current-datetime>""" )
+        self.textbox.insert("0.0", f"""
+<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+    <current-datetime>{get_current_time()}</current-datetime>
+</set-current-datetime>""")
+
     def execute_time_set(self):
         try:
             rpc = to_ele(self.textbox.get("1.0", END))
