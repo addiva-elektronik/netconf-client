@@ -208,10 +208,6 @@ class App(customtkinter.CTk):
             messagebox.showerror(APP_TITLE, "ERROR: Connection parameters cannot be empty!")            
             return
 
-        if not self.is_ip_valid():
-            messagebox.showerror(APP_TITLE, "ERROR: IP Format invalid!")            
-            return
-
         if not self.is_port_valid():
             messagebox.showerror(APP_TITLE, "ERROR: Port must be in range 0-65535")            
             return
@@ -233,17 +229,6 @@ class App(customtkinter.CTk):
                 return False
         except:
             return False
-
-    def is_ip_valid(self):
-        ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
-        
-        if re.fullmatch(ip_pattern, self.address.get()):
-            octets = self.address.get().split('.')
-            for octet in octets:
-                if not (0 <= int(octet) <= 255):
-                    return False
-            return True
-        return False
 
     def is_empty_connection_parameters(self):
         if self.cfg['addr'] == "" or self.cfg['port'] == "" or self.cfg['user']=="" or self.cfg['pass']=="":
