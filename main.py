@@ -154,13 +154,19 @@ class App(ctk.CTk):
 
         edit_menu.add_cascade(label='Zoom', menu=zoom_submenu, underline=0)
 
-        file_menu.add_command(label="Import XML", underline=0,
-                              command=self.import_xml_file)
-        file_menu.add_command(label="Export XML", underline=0,
-                              command=self.export_xml_file)
+        file_menu.add_command(label="Open", underline=0,
+                              accelerator="Ctrl+O",
+                              command=self.open_file)
+        self.bind_all("<Control-o>", lambda event: self.open_file)
+        file_menu.add_command(label="Save", underline=0,
+                              accelerator="Ctrl+S",
+                              command=self.save_file)
+        self.bind_all("<Control-s>", lambda event: self.save_file)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", underline=0,
-                              command=self.exit_app_cb)
+                              accelerator="Ctrl+Q",
+                              command=self.quit)
+        self.bind_all("<Control-q>", lambda event: self.quit())
 
         self.menubar.add_cascade(label="File", underline=0, menu=file_menu)
         self.menubar.add_cascade(label="Edit", underline=0, menu=edit_menu)
@@ -383,23 +389,20 @@ class App(ctk.CTk):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         ctk.set_widget_scaling(new_scaling_float)
 
-    def exit_app_cb(self):
-        self.quit()
-
-    def import_xml_file(self):
+    def open_file(self):
         files = [('XML File', '*.xml')]
         file = filedialog.askopenfile(filetypes=files, defaultextension=files)
         if file is not None:
             content = file.read()
             self.show(content)
 
-    def export_xml_file(self):
+    def save_file(self):
         files = [('XML File', '*.xml')]
-        file_path = filedialog.asksaveasfilename(filetypes=files,
-                                                 defaultextension=files)
-        if file_path:
-            with open(file_path, "w") as xmlOutput:
-                xmlOutput.write(self.textbox.get('1.0', END))
+        path = filedialog.asksaveasfilename(filetypes=files,
+                                            defaultextension=files)
+        if path:
+            with open(path, "w") as file:
+                file.write(self.textbox.get('1.0', END))
 
     # CONNECTION PARAMETERS METHODS
     def save_params(self):
