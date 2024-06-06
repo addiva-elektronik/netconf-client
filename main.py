@@ -3,7 +3,7 @@ import os
 import re
 import json
 import subprocess
-import customtkinter
+import customtkinter as ctk
 from tkinter import *
 from tkinter import messagebox, filedialog
 from PIL import ImageTk, Image
@@ -24,8 +24,8 @@ class CommandType(Enum):
     DEFAULT = 3
 
 APP_TITLE="Simple NETCONF Client"
-customtkinter.set_appearance_mode("System") 
-customtkinter.set_default_color_theme("blue")
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
 
 #FUNCTION TO GET FULL FILE PATH
 def resource_path(relative_path):
@@ -91,7 +91,7 @@ class NetconfConnection:
             self.manager.close_session()
             self.app.status("Disconnected from NETCONF server")
 
-class App(customtkinter.CTk):
+class App(ctk.CTk):
     def __init__(self):
         self.cfg_mgr = ConfigManager()
         self.cfg = self.cfg_mgr.cfg
@@ -136,66 +136,66 @@ class App(customtkinter.CTk):
 
 
         # create sidebar frame with widgets
-        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=8, sticky="nsew")
         
-        self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="NETCONF Client", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="NETCONF Client", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
         
-        self.factory_reset_button = customtkinter.CTkButton(self.sidebar_frame, command=self.factory_reset_func, text="Factory Reset")
+        self.factory_reset_button = ctk.CTkButton(self.sidebar_frame, command=self.factory_reset_func, text="Factory Reset")
         self.factory_reset_button.grid(row=1, column=0, padx=20, pady=10)
         
-        self.reboot_button = customtkinter.CTkButton(self.sidebar_frame, command=self.reboot_func, text="Reboot")
+        self.reboot_button = ctk.CTkButton(self.sidebar_frame, command=self.reboot_func, text="Reboot")
         self.reboot_button.grid(row=2, column=0, padx=20, pady=10)
         
-        self.time_set_button = customtkinter.CTkButton(self.sidebar_frame, command=self.time_set_func, text="Set System Time")
+        self.time_set_button = ctk.CTkButton(self.sidebar_frame, command=self.time_set_func, text="Set System Time")
         self.time_set_button.grid(row=3, column=0, padx=20, pady=10)
 
-        self.profinet_label = customtkinter.CTkLabel(self.sidebar_frame, text="Profinet Status:", anchor="w")
+        self.profinet_label = ctk.CTkLabel(self.sidebar_frame, text="Profinet Status:", anchor="w")
         self.profinet_label.grid(row=4, column=0, padx=20, pady=(30, 0))
-        self.enable_profinet_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.profinet_status_func, values=["Enable","Disable"])
+        self.enable_profinet_button = ctk.CTkOptionMenu(self.sidebar_frame, command=self.profinet_status_func, values=["Enable","Disable"])
         self.enable_profinet_button.grid(row=5, column=0, padx=20, pady=0)
 
-        self.getconfiguration_label = customtkinter.CTkLabel(self.sidebar_frame, text="Get configuration", anchor="w")
+        self.getconfiguration_label = ctk.CTkLabel(self.sidebar_frame, text="Get configuration", anchor="w")
         self.getconfiguration_label.grid(row=6, column=0, padx=20, pady=(30, 0))
-        self.getconfiguraiton_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.getconfiguration_func, values=["Running","Startup"])
+        self.getconfiguraiton_button = ctk.CTkOptionMenu(self.sidebar_frame, command=self.getconfiguration_func, values=["Running","Startup"])
         self.getconfiguraiton_button.grid(row=7, column=0, padx=20, pady=0)
 
         # create textbox
-        self.textbox = customtkinter.CTkTextbox(self, width=250)
+        self.textbox = ctk.CTkTextbox(self, width=250)
         self.textbox.grid(row=0, column=1, columnspan=2, rowspan=3, padx=(20, 0), pady=(20, 0), sticky="nsew")
 
-        self.status_label = customtkinter.CTkLabel(self, anchor="w")
+        self.status_label = ctk.CTkLabel(self, anchor="w")
         self.status_label.grid(row=3, column=1, columnspan=1, padx=(20, 0), pady=(0, 0), sticky="we")
         self.status("Ready")
 
-        self.send_button = customtkinter.CTkButton(master=self, fg_color="transparent", text="Send", border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
+        self.send_button = ctk.CTkButton(master=self, fg_color="transparent", text="Send", border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
         self.send_button.grid(row=3, column=2, padx=(20, 0), pady=(20, 20), sticky="nsew")
 
         # create radiobutton frame
-        self.connection_parameters_frame = customtkinter.CTkFrame(self)
+        self.connection_parameters_frame = ctk.CTkFrame(self)
         self.connection_parameters_frame.grid(row=0, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
         self.radio_var = tkinter.IntVar(value=0)
-        self.label_radio_group = customtkinter.CTkLabel(master=self.connection_parameters_frame, text="Connection Parameters:")
+        self.label_radio_group = ctk.CTkLabel(master=self.connection_parameters_frame, text="Connection Parameters:")
         self.label_radio_group.grid(row=0, column=2, columnspan=1, padx=10, pady=10, sticky="", )
-        self.address = customtkinter.CTkEntry(self.connection_parameters_frame, placeholder_text="Device Address")
+        self.address = ctk.CTkEntry(self.connection_parameters_frame, placeholder_text="Device Address")
         if self.cfg['addr']:
             self.address.insert(0, self.cfg['addr'])
         self.address.grid(row=1, column=2, pady=10, padx=20, sticky="n")
-        self.username = customtkinter.CTkEntry(self.connection_parameters_frame)
+        self.username = ctk.CTkEntry(self.connection_parameters_frame)
         if self.cfg['user']:
             self.username.insert(0, self.cfg['user'])
         self.username.grid(row=2, column=2, pady=10, padx=20, sticky="n")
-        self.password = customtkinter.CTkEntry(self.connection_parameters_frame, placeholder_text="Password", show="*")
+        self.password = ctk.CTkEntry(self.connection_parameters_frame, placeholder_text="Password", show="*")
         if self.cfg['pass']:
             self.password.insert(0, self.cfg['pass'])
         self.password.grid(row=3, column=2, pady=10, padx=20, sticky="n")
-        self.port_select = customtkinter.CTkEntry(self.connection_parameters_frame)
+        self.port_select = ctk.CTkEntry(self.connection_parameters_frame)
         self.port_select.grid(row=4, column=2, pady=10, padx=20, sticky="n")
         if self.cfg['port']:
             self.port_select.insert(0, self.cfg['port'])
 
-        self.save_connection_parameters_button =  customtkinter.CTkButton(self.connection_parameters_frame, command=self.save_connection_parameters, text="Save Parameters")
+        self.save_connection_parameters_button =  ctk.CTkButton(self.connection_parameters_frame, command=self.save_connection_parameters, text="Save Parameters")
         self.save_connection_parameters_button.grid(row=9, column=2, pady=(10,0), padx=20, sticky="n")
 
         # set default values
@@ -246,18 +246,18 @@ class App(customtkinter.CTk):
         except Exception:
             pass
 
-        # Fallback to CustomTkinter detected system
+        # Fallback to Ctk detected system
         print("Falling back to ctk system theme")
         self.change_theme_mode_event("System")
 
     def get_menu_bg_color(self):
-        if customtkinter.get_appearance_mode() == "Dark":
+        if ctk.get_appearance_mode() == "Dark":
             return "#333333"
         else:
             return "#f0f0f0"
 
     def get_menu_fg_color(self):
-        if customtkinter.get_appearance_mode() == "Dark":
+        if ctk.get_appearance_mode() == "Dark":
             return "#ffffff"
         else:
             return "#000000"
@@ -286,16 +286,16 @@ class App(customtkinter.CTk):
         self.textbox.insert("0.0", text)
 
     def open_input_dialog_event(self):
-        dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
+        dialog = ctk.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
         print("CTkInputDialog:", dialog.get_input())
 
     def change_theme_mode_event(self, theme: str):
-        customtkinter.set_appearance_mode(theme)
+        ctk.set_appearance_mode(theme)
         self.update_menu_colors()
 
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
-        customtkinter.set_widget_scaling(new_scaling_float)
+        ctk.set_widget_scaling(new_scaling_float)
 
     def exit_app_func(self):
         self.quit()
