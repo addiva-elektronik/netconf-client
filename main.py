@@ -2,6 +2,7 @@ import tkinter
 import os
 import re
 import json
+import subprocess
 import customtkinter
 from tkinter import *
 from tkinter import messagebox, filedialog
@@ -105,37 +106,33 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure((0, 1, 2), weight=1)
 
 
-        menubar = Menu(self)
-        self.config(menu=menubar)
+        self.menubar = Menu(self, tearoff=0, bd=0)
+        self.config(menu=self.menubar)
 
-        appearance_menu = Menu(menubar)
-        file_menu = Menu(menubar)    
+        edit_menu = Menu(self.menubar, tearoff=0)
+        file_menu = Menu(self.menubar, tearoff=0)
 
-        appearance_submenu = Menu(appearance_menu)
-        appearance_submenu.add_command(label="Light", command = lambda: self.change_appearance_mode_event("Light"))
-        appearance_submenu.add_command(label="Dark", command = lambda: self.change_appearance_mode_event("Dark"))
-        appearance_submenu.add_command(label="System", command = lambda: self.change_appearance_mode_event("System"))
-        appearance_menu.add_cascade(label='Appearance Mode', menu=appearance_submenu, underline=0)
+        theme_submenu = Menu(edit_menu, tearoff=0)
+        theme_submenu.add_command(label="Light", command = lambda: self.change_theme_mode_event("Light"))
+        theme_submenu.add_command(label="Dark", command = lambda: self.change_theme_mode_event("Dark"))
+        edit_menu.add_cascade(label='Theme', menu=theme_submenu, underline=0)
 
-        zoom_submenu = Menu(appearance_menu)
+        zoom_submenu = Menu(edit_menu, tearoff=0)
         zoom_submenu.add_command(label="80%", command =  lambda: self.change_scaling_event("80%"))
         zoom_submenu.add_command(label="90%", command = lambda: self.change_scaling_event("90%"))
         zoom_submenu.add_command(label="100%", command = lambda: self.change_scaling_event("100%"))
         zoom_submenu.add_command(label="110%", command = lambda: self.change_scaling_event("110%"))
         zoom_submenu.add_command(label="120%", command = lambda: self.change_scaling_event("120%"))
 
-        appearance_menu.add_cascade(label='Zoom Level', menu=zoom_submenu, underline=0)
-        appearance_menu.add_separator()
+        edit_menu.add_cascade(label='Zoom', menu=zoom_submenu, underline=0)
 
         file_menu.add_command(label="Import XML", underline=0, command=self.import_xml_file)
-        file_menu.add_separator()
         file_menu.add_command(label="Export XML", underline=0, command=self.export_xml_file)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", underline=0, command=self.exit_app_func)
-        file_menu.add_separator()
 
-        menubar.add_cascade(label="File", underline=0, menu=file_menu)
-        menubar.add_cascade(label="Appearance", underline=0, menu=appearance_menu)
+        self.menubar.add_cascade(label="File", underline=0, menu=file_menu)
+        self.menubar.add_cascade(label="Edit", underline=0, menu=edit_menu)
 
 
         # create sidebar frame with widgets
@@ -202,12 +199,74 @@ class App(customtkinter.CTk):
         self.save_connection_parameters_button.grid(row=9, column=2, pady=(10,0), padx=20, sticky="n")
 
         # set default values
-        self.change_appearance_mode_event("System")
+        self.set_system_theme()
         self.change_scaling_event("100%")
         self.textbox.delete(0.0,'end')
         self.textbox.insert("0.0", "XML Command Goes here!" )
 
     #UI METHODS
+    def set_system_theme(self):
+        try:
+            # Check for dark mode on Linux Mint using gsettings
+            result = subprocess.run(['gsettings', 'get', 'org.cinnamon.desktop.interface', 'gtk-theme'], capture_output=True, text=True)
+            if result.returncode == 0:
+                theme = result.stdout.strip().strip("'")
+                if 'dark' in theme.lower():
+                    self.change_theme_mode_event("Dark")
+                else:
+                    self.change_theme_mode_event("Light")
+                return
+        except Exception:
+            pass
+
+        try:
+            # Check for dark mode on Gnome using gsettings
+            result = subprocess.run(['gsettings', 'get', 'org.gnome.desktop.interface', 'color-scheme'], capture_output=True, text=True)
+            if result.returncode == 0:
+                theme = result.stdout.strip().strip("'")
+                if 'dark' in theme.lower():
+                    self.change_theme_mode_event("Dark")
+                else:
+                    self.change_theme_mode_event("Light")
+                return
+        except Exception:
+            pass
+
+        try:
+            # Check for dark mode on Windows
+            if platform.system() == "Windows":
+                import winreg
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize')
+                value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
+                if value == 0:
+                    self.change_theme_mode_event("Dark")
+                else:
+                    self.change_theme_mode_event("Light")
+                return
+        except Exception:
+            pass
+
+        # Fallback to CustomTkinter detected system
+        print("Falling back to ctk system theme")
+        self.change_theme_mode_event("System")
+
+    def get_menu_bg_color(self):
+        if customtkinter.get_appearance_mode() == "Dark":
+            return "#333333"
+        else:
+            return "#f0f0f0"
+
+    def get_menu_fg_color(self):
+        if customtkinter.get_appearance_mode() == "Dark":
+            return "#ffffff"
+        else:
+            return "#000000"
+
+    def update_menu_colors(self):
+        self.menubar.configure(bg=self.get_menu_bg_color(), fg=self.get_menu_fg_color())
+        for menu in self.menubar.winfo_children():
+            menu.configure(bg=self.get_menu_bg_color(), fg=self.get_menu_fg_color())
+
     def _update_status(self, message, error=False):
         if error:
             self.status_label.configure(text=f"Error: {message}",
@@ -230,8 +289,9 @@ class App(customtkinter.CTk):
         dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
         print("CTkInputDialog:", dialog.get_input())
 
-    def change_appearance_mode_event(self, new_appearance_mode: str):
-        customtkinter.set_appearance_mode(new_appearance_mode)
+    def change_theme_mode_event(self, theme: str):
+        customtkinter.set_appearance_mode(theme)
+        self.update_menu_colors()
 
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
