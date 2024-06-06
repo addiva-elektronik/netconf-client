@@ -121,6 +121,7 @@ class App(ctk.CTk):
 
         self.title(APP_TITLE)
         self.geometry(f"{1100}x{580}")
+        self.minsize(800, 600)  # Handle shrinking app window on zoom in/out
 
         # configure grid layout (4x4)
         self.grid_columnconfigure(1, weight=1)
@@ -130,29 +131,26 @@ class App(ctk.CTk):
         self.menubar = Menu(self, tearoff=0, bd=0)
         self.config(menu=self.menubar)
 
-        edit_menu = Menu(self.menubar, tearoff=0)
+        settings_menu = Menu(self.menubar, tearoff=0)
         file_menu = Menu(self.menubar, tearoff=0)
 
-        theme_submenu = Menu(edit_menu, tearoff=0, relief=FLAT, font=("Verdana", 12))
-        theme_submenu.add_command(label="Light", command=lambda:
-                                  self.change_theme_mode_event("Light"))
-        theme_submenu.add_command(label="Dark", command=lambda:
-                                  self.change_theme_mode_event("Dark"))
-        edit_menu.add_cascade(label='Theme', menu=theme_submenu, underline=0)
+        self.theme_var = ctk.StringVar(value="System")
+        self.zoom_var = ctk.StringVar(value="100%")
 
-        zoom_submenu = Menu(edit_menu, tearoff=0)
-        zoom_submenu.add_command(label="80%", command=lambda:
-                                 self.change_scaling_event("80%"))
-        zoom_submenu.add_command(label="90%", command=lambda:
-                                 self.change_scaling_event("90%"))
-        zoom_submenu.add_command(label="100%", command=lambda:
-                                 self.change_scaling_event("100%"))
-        zoom_submenu.add_command(label="110%", command=lambda:
-                                 self.change_scaling_event("110%"))
-        zoom_submenu.add_command(label="120%", command=lambda:
-                                 self.change_scaling_event("120%"))
+        settings_menu.add_radiobutton(label="Light Mode", variable=self.theme_var,
+                                      command=lambda: self.change_theme_mode_event("Light"))
+        settings_menu.add_radiobutton(label="Dark Mode", variable=self.theme_var,
+                                      command=lambda: self.change_theme_mode_event("Dark"))
 
-        edit_menu.add_cascade(label='Zoom', menu=zoom_submenu, underline=0)
+        settings_menu.add_separator()
+
+        settings_menu.add_command(label="Zoom In", accelerator="Ctrl++",
+                                  command=self.zoom_in_event)
+        self.bind_all("<Control-plus>", lambda event: self.zoom_in_event())
+
+        settings_menu.add_command(label="Zoom Out", accelerator="Ctrl+-",
+                                  command=self.zoom_out_event)
+        self.bind_all("<Control-minus>", lambda event: self.zoom_out_event())
 
         file_menu.add_command(label="Open", underline=0,
                               accelerator="Ctrl+O",
@@ -169,7 +167,7 @@ class App(ctk.CTk):
         self.bind_all("<Control-q>", lambda event: self.quit())
 
         self.menubar.add_cascade(label="File", underline=0, menu=file_menu)
-        self.menubar.add_cascade(label="Edit", underline=0, menu=edit_menu)
+        self.menubar.add_cascade(label="Settings", underline=0, menu=settings_menu)
 
         # create sidebar frame with widgets
         self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
@@ -388,6 +386,20 @@ class App(ctk.CTk):
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         ctk.set_widget_scaling(new_scaling_float)
+
+    def zoom_in_event(self):
+        current_zoom = int(self.zoom_var.get().replace("%", ""))
+        if current_zoom < 120:
+            new_zoom = current_zoom + 10
+            self.change_scaling_event(f"{new_zoom}%")
+            self.zoom_var.set(f"{new_zoom}%")
+
+    def zoom_out_event(self):
+        current_zoom = int(self.zoom_var.get().replace("%", ""))
+        if current_zoom > 80:
+            new_zoom = current_zoom - 10
+            self.change_scaling_event(f"{new_zoom}%")
+            self.zoom_var.set(f"{new_zoom}%")
 
     def open_file(self):
         files = [('XML File', '*.xml')]
