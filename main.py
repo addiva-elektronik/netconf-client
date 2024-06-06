@@ -54,9 +54,11 @@ class ConfigManager:
         self.default_cfg = {
             'addr': '',
             'port': 830,
-            'user': 'admin',
+            'user': "admin",
             'pass': '',
-            'ssh-agent': True
+            'ssh-agent': True,
+            'theme': "System",
+            'zoom': "100%"
         }
         self.cfg = self.default_cfg.copy()
         self.load()
@@ -123,6 +125,10 @@ class App(ctk.CTk):
         self.geometry(f"{1100}x{580}")
         self.minsize(800, 600)  # Handle shrinking app window on zoom in/out
 
+        # Create theme and zoom variables for menu interaction
+        self.theme_var = ctk.StringVar(value=self.cfg['theme'])
+        self.zoom_var = ctk.StringVar(value=self.cfg['zoom'])
+
         # configure grid layout (4x4)
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure((2, 3), weight=0)
@@ -134,12 +140,11 @@ class App(ctk.CTk):
         settings_menu = Menu(self.menubar, tearoff=0)
         file_menu = Menu(self.menubar, tearoff=0)
 
-        self.theme_var = ctk.StringVar(value="System")
-        self.zoom_var = ctk.StringVar(value="100%")
-
-        settings_menu.add_radiobutton(label="Light Mode", variable=self.theme_var,
+        settings_menu.add_radiobutton(label="System", variable=self.theme_var,
+                                      command=lambda: self.change_theme_mode_event("System"))
+        settings_menu.add_radiobutton(label="Light", variable=self.theme_var,
                                       command=lambda: self.change_theme_mode_event("Light"))
-        settings_menu.add_radiobutton(label="Dark Mode", variable=self.theme_var,
+        settings_menu.add_radiobutton(label="Dark", variable=self.theme_var,
                                       command=lambda: self.change_theme_mode_event("Dark"))
 
         settings_menu.add_separator()
@@ -269,15 +274,17 @@ class App(ctk.CTk):
                                          command=self.save_params, text="Save")
         self.save_button.grid(row=6, column=0, pady=10, padx=20, sticky="ew")
 
+        # Check if theme is set to "System", otherwise use saved theme
+        self.change_theme_mode_event(self.cfg['theme'])
+        self.change_scaling_event(f"{self.cfg['zoom']}%")
+
         # set default values
         self.rpc_cb = None
-        self.set_system_theme()
-        self.change_scaling_event("100%")
         self.textbox.delete(0.0, 'end')
         self.textbox.insert("0.0", "XML Command Goes here!")
 
     # UI METHODS
-    def set_system_theme(self):
+    def get_system_theme(self):
         try:
             # Check for dark mode on Linux Mint using gsettings
             result = subprocess.run(['gsettings', 'get',
@@ -288,10 +295,8 @@ class App(ctk.CTk):
             if result.returncode == 0:
                 theme = result.stdout.strip().strip("'")
                 if 'dark' in theme.lower():
-                    self.change_theme_mode_event("Dark")
-                else:
-                    self.change_theme_mode_event("Light")
-                return
+                    return "Dark"
+                return "Light"
         except Exception:
             pass
 
@@ -305,10 +310,8 @@ class App(ctk.CTk):
             if result.returncode == 0:
                 theme = result.stdout.strip().strip("'")
                 if 'dark' in theme.lower():
-                    self.change_theme_mode_event("Dark")
-                else:
-                    self.change_theme_mode_event("Light")
-                return
+                    return "Dark"
+                return "Light"
         except Exception:
             pass
 
@@ -320,16 +323,13 @@ class App(ctk.CTk):
                       "Microsoft\Windows\CurrentVersion\Themes\Personalize')
                 value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
                 if value == 0:
-                    self.change_theme_mode_event("Dark")
-                else:
-                    self.change_theme_mode_event("Light")
-                return
+                    return "Dark"
+                return "Light"
         except Exception:
             pass
 
         # Fallback to Ctk detected system
-        print("Falling back to ctk system theme")
-        self.change_theme_mode_event("System")
+        return "System"
 
     def get_menu_bg_color(self):
         if ctk.get_appearance_mode() == "Dark":
@@ -344,11 +344,11 @@ class App(ctk.CTk):
             return "#000000"
 
     def update_menu_colors(self):
-        self.menubar.configure(bg=self.get_menu_bg_color(),
-                               fg=self.get_menu_fg_color())
+        bg = self.get_menu_bg_color()
+        fg = self.get_menu_fg_color()
+        self.menubar.configure(bg=bg, fg=fg)
         for menu in self.menubar.winfo_children():
-            menu.configure(bg=self.get_menu_bg_color(),
-                           fg=self.get_menu_fg_color())
+            menu.configure(bg=bg, fg=fg)
 
     def _update_status(self, message, error=False):
         if error:
@@ -380,12 +380,18 @@ class App(ctk.CTk):
         print("CTkInputDialog:", dialog.get_input())
 
     def change_theme_mode_event(self, theme: str):
+        self.cfg['theme'] = theme
+        self.cfg_mgr.save()
+        if theme == 'System':
+            theme = self.get_system_theme()
         ctk.set_appearance_mode(theme)
         self.update_menu_colors()
 
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         ctk.set_widget_scaling(new_scaling_float)
+        self.cfg['zoom'] = new_scaling
+        self.cfg_mgr.save()
 
     def zoom_in_event(self):
         current_zoom = int(self.zoom_var.get().replace("%", ""))
