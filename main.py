@@ -150,7 +150,7 @@ class App(ctk.CTk):
                               command=self.export_xml_file)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", underline=0,
-                              command=self.exit_app_func)
+                              command=self.exit_app_cb)
 
         self.menubar.add_cascade(label="File", underline=0, menu=file_menu)
         self.menubar.add_cascade(label="Edit", underline=0, menu=edit_menu)
@@ -164,22 +164,22 @@ class App(ctk.CTk):
         self.logo.grid(row=0, column=0, padx=20, pady=(20, 10))
 
         self.factory_reset = ctk.CTkButton(self.sidebar_frame,
-                                           command=self.factory_reset_func,
+                                           command=self.factory_reset_cb,
                                            text="Factory Reset")
         self.factory_reset.grid(row=1, column=0, padx=20, pady=10)
 
         self.reboot = ctk.CTkButton(self.sidebar_frame,
-                                    command=self.reboot_func,
+                                    command=self.reboot_cb,
                                     text="Reboot")
         self.reboot.grid(row=2, column=0, padx=20, pady=10)
 
         self.time_set = ctk.CTkButton(self.sidebar_frame,
-                                      command=self.time_set_func,
+                                      command=self.time_set_cb,
                                       text="Set System Time")
         self.time_set.grid(row=3, column=0, padx=20, pady=10)
 
         self.get_oper = ctk.CTkButton(self.sidebar_frame,
-                                      command=self.get_oper_func,
+                                      command=self.get_oper_cb,
                                       text="Get Status")
         self.get_oper.grid(row=4, column=0, padx=20, pady=10)
 
@@ -188,7 +188,7 @@ class App(ctk.CTk):
                                              anchor="w")
         self.get_config_label.grid(row=5, column=0, padx=20, pady=(30, 0))
         self.get_config_button = ctk.CTkOptionMenu(self.sidebar_frame,
-                                                   command=self.get_config_func,
+                                                   command=self.get_config_cb,
                                                    values=["Running",
                                                            "Startup"])
         self.get_config_button.grid(row=6, column=0, padx=20, pady=0)
@@ -198,7 +198,7 @@ class App(ctk.CTk):
                                            anchor="w")
         self.profinet_label.grid(row=7, column=0, padx=20, pady=(30, 0))
         self.profinet_button = ctk.CTkOptionMenu(self.sidebar_frame,
-                                                 command=self.profinet_func,
+                                                 command=self.profinet_cb,
                                                  values=["Enable",
                                                          "Disable"])
         self.profinet_button.grid(row=8, column=0, padx=20, pady=0)
@@ -366,7 +366,7 @@ class App(ctk.CTk):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         ctk.set_widget_scaling(new_scaling_float)
 
-    def exit_app_func(self):
+    def exit_app_cb(self):
         self.quit()
 
     def import_xml_file(self):
@@ -430,7 +430,7 @@ class App(ctk.CTk):
 
         return os.path.join(base_path, relative_path)
 
-    def profinet_func(self, status):
+    def profinet_cb(self, status):
         xml_path = ""
         if status == "Enable":
             xml_path = self._full_path("enable-profinet.xml")
@@ -442,7 +442,7 @@ class App(ctk.CTk):
         self.show(xml_payload)
 
     # GET CONFIGURATION/DATASTORE METHOD
-    def get_config_func(self, config):
+    def get_config_cb(self, config):
         if self.is_empty_connection_parameters():
             self.error("Connection parameters cannot be empty!")
             return
@@ -460,7 +460,7 @@ class App(ctk.CTk):
                 print(err)
 
     # Operational method(s)
-    def get_oper_func(self):
+    def get_oper_cb(self):
         """Fetch operational data"""
         nc_filter = """
         <filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
@@ -493,7 +493,7 @@ class App(ctk.CTk):
                 print(err)
 
     # REBOOT METHODS
-    def reboot_func(self):
+    def reboot_cb(self):
         self.show(RPC_SYSTEM_RESTART)
 
     def execute_reboot(self):
@@ -509,7 +509,7 @@ class App(ctk.CTk):
                 print(err)
 
     # FACTORY RESET METHODS
-    def factory_reset_func(self):
+    def factory_reset_cb(self):
         self.show(RPC_FACTORY_RESET)
 
     def execute_factory_reset(self):
@@ -525,7 +525,7 @@ class App(ctk.CTk):
                 print(err)
 
     # TIME SETTING METHODS
-    def time_set_func(self):
+    def time_set_cb(self):
         self.show(RPC_SET_DATETIME)
 
     def execute_time_set(self):
