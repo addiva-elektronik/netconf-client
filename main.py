@@ -11,7 +11,7 @@ import datetime
 import platform
 from enum import Enum
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, filedialog
+from tkinter import Menu, END, FLAT, filedialog
 import customtkinter as ctk
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
@@ -133,7 +133,7 @@ class App(ctk.CTk):
         edit_menu = Menu(self.menubar, tearoff=0)
         file_menu = Menu(self.menubar, tearoff=0)
 
-        theme_submenu = Menu(edit_menu, tearoff=0)
+        theme_submenu = Menu(edit_menu, tearoff=0, relief=FLAT, font=("Verdana", 12))
         theme_submenu.add_command(label="Light", command=lambda:
                                   self.change_theme_mode_event("Light"))
         theme_submenu.add_command(label="Dark", command=lambda:
