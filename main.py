@@ -28,13 +28,23 @@ RPC_SET_DATETIME = f"""<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:
     <current-datetime>{datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()}</current-datetime>
 </set-current-datetime>
 """
-
-
-class CommandType(Enum):
-    FACTORY_RESET = 0
-    REBOOT = 1
-    TIME_SET = 2
-    DEFAULT = 3
+RPC_GET_OPER = """<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
+        <interface>
+            <name/>
+            <statistics/>
+        </interface>
+    </interfaces>
+    <system xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+        <clock/>
+        <hostname/>
+        <contact/>
+        <location/>
+        <platform/>
+        <uptime/>
+    </system>
+</filter>
+"""
 
 
 class ConfigManager:
@@ -256,6 +266,7 @@ class App(ctk.CTk):
         self.save_button.grid(row=6, column=0, pady=10, padx=20, sticky="ew")
 
         # set default values
+        self.rpc_cb = None
         self.set_system_theme()
         self.change_scaling_event("100%")
         self.textbox.delete(0.0, 'end')
@@ -340,11 +351,17 @@ class App(ctk.CTk):
             self.status_label.configure(text=f"Error: {message}",
                                         text_color=("#FF0000", "#FF4C4C"))
         else:
-            self.status_label.configure(text=f"Status: {message}",
+            self.status_label.configure(text=message,
                                         text_color=("#000000", "#FFFFFF"))
+        # Update GUI even if we run in an callback
+        self.update_idletasks()
+
+    def rpc(self, message, method):
+        self._update_status(f"RPC: {message}", error=False)
+        self.rpc_cb = method
 
     def status(self, message):
-        self._update_status(message, error=False)
+        self._update_status(f"Status: {message}", error=False)
 
     def error(self, message):
         self._update_status(message, error=True)
@@ -447,11 +464,12 @@ class App(ctk.CTk):
             self.error("Connection parameters cannot be empty!")
             return
 
+        config = str(config).lower()
+        self.status(f"Fetching {config}-config ...")
         with NetconfConnection(self.cfg, self) as m:
             if m is None:
                 return
             try:
-                config = str(config).lower()
                 result = m.get_config(source=config)
                 dom = parseString(result.xml)
                 self.show(str(dom.toprettyxml()))
@@ -461,27 +479,14 @@ class App(ctk.CTk):
 
     # Operational method(s)
     def get_oper_cb(self):
-        """Fetch operational data"""
-        nc_filter = """
-        <filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-            <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
-                <interface>
-                    <name/>
-                    <statistics/>
-                </interface>
-            </interfaces>
-            <system xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
-                <clock/>
-                <hostname/>
-                <contact/>
-                <location/>
-                <platform/>
-                <uptime/>
-            </system>
-        </filter>
-        """
+        """Show NETCONF get filter for operational data"""
+        self.show(RPC_GET_OPER)
+        self.rpc("Get operational status", self.execute_get_oper)
 
+    def execute_get_oper(self):
+        """Fetch operational data"""
         with NetconfConnection(self.cfg, self) as m:
+            nc_filter = to_ele(self.textbox.get("1.0", END))
             if m is None:
                 return
             try:
@@ -495,6 +500,7 @@ class App(ctk.CTk):
     # REBOOT METHODS
     def reboot_cb(self):
         self.show(RPC_SYSTEM_RESTART)
+        self.rpc("Reboot device", self.execute_reboot)
 
     def execute_reboot(self):
         rpc = to_ele(self.textbox.get("1.0", END))
@@ -511,6 +517,7 @@ class App(ctk.CTk):
     # FACTORY RESET METHODS
     def factory_reset_cb(self):
         self.show(RPC_FACTORY_RESET)
+        self.rpc("Perform factory reset", self.execute_factory_reset)
 
     def execute_factory_reset(self):
         with NetconfConnection(self.cfg, self) as m:
@@ -527,6 +534,7 @@ class App(ctk.CTk):
     # TIME SETTING METHODS
     def time_set_cb(self):
         self.show(RPC_SET_DATETIME)
+        self.rpc("Set system date/time", self.execute_time_set)
 
     def execute_time_set(self):
         with NetconfConnection(self.cfg, self) as m:
@@ -541,30 +549,14 @@ class App(ctk.CTk):
                 print(err)
 
     # NETCONF COMMANDS METHODS
-    def get_type_of_command(self):
-        if "<system-restart xmlns" in str(self.textbox.get("1.0", END)):
-            return CommandType.REBOOT.value
-        if "<factory-reset xmlns" in str(self.textbox.get("1.0", END)):
-            return CommandType.FACTORY_RESET.value
-        if "<set-current-datetime xmlns" in str(self.textbox.get("1.0", END)):
-            return CommandType.TIME_SET.value
-        return CommandType.DEFAULT.value
-
     def execute_netconf_command(self):
         if self.is_empty_connection_parameters():
             self.error("Connection parameters cannot be empty!")
             return
 
-        if self.get_type_of_command() == CommandType.REBOOT.value:
-            self.execute_reboot()
-            return
-
-        if self.get_type_of_command() == CommandType.FACTORY_RESET.value:
-            self.execute_factory_reset()
-            return
-
-        if self.get_type_of_command() == CommandType.TIME_SET.value:
-            self.execute_time_set()
+        if self.rpc_cb:
+            self.rpc_cb()
+            self.rpc_cb = None
             return
 
         with NetconfConnection(self.cfg, self) as m:
