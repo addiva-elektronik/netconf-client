@@ -143,7 +143,6 @@ class App(ctk.CTk):
         self.menubar.add_cascade(label="File", underline=0, menu=file_menu)
         self.menubar.add_cascade(label="Edit", underline=0, menu=edit_menu)
 
-
         # create sidebar frame with widgets
         self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=8, sticky="nsew")
@@ -181,35 +180,34 @@ class App(ctk.CTk):
         self.send_button = ctk.CTkButton(master=self, fg_color="transparent", text="Send", border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
         self.send_button.grid(row=3, column=2, padx=(20, 0), pady=(20, 20), sticky="nsew")
 
-        # create radiobutton frame
-        self.connection_parameters_frame = ctk.CTkFrame(self)
-        self.connection_parameters_frame.grid(row=0, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
-        self.radio_var = tkinter.IntVar(value=0)
-        self.label_radio_group = ctk.CTkLabel(master=self.connection_parameters_frame, text="Connection Parameters:")
-        self.label_radio_group.grid(row=0, column=2, columnspan=1, padx=10, pady=10, sticky="", )
-        self.address = ctk.CTkEntry(self.connection_parameters_frame, placeholder_text="Device Address")
-        if self.cfg['addr']:
-            self.address.insert(0, self.cfg['addr'])
-        self.address.grid(row=1, column=2, pady=10, padx=20, sticky="n")
-        self.username = ctk.CTkEntry(self.connection_parameters_frame)
-        if self.cfg['user']:
-            self.username.insert(0, self.cfg['user'])
-        self.username.grid(row=2, column=2, pady=10, padx=20, sticky="n")
-        self.password = ctk.CTkEntry(self.connection_parameters_frame, placeholder_text="Password", show="*")
-        if self.cfg['pass']:
-            self.password.insert(0, self.cfg['pass'])
-        self.password.grid(row=3, column=2, pady=10, padx=20, sticky="n")
-        self.port_select = ctk.CTkEntry(self.connection_parameters_frame)
-        self.port_select.grid(row=4, column=2, pady=10, padx=20, sticky="n")
-        if self.cfg['port']:
-            self.port_select.insert(0, self.cfg['port'])
-        self.ssh_agent = ctk.CTkSwitch(self.connection_parameters_frame, text="SSH Agent")
-        self.ssh_agent.grid(row=5, column=2, pady=10, padx=20, sticky="n")
+        # Connection Parameters frame
+        self.conn_param_frame = ctk.CTkFrame(self)
+        self.conn_param_frame.grid(row=0, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
+        self.conn_param_label = ctk.CTkLabel(master=self.conn_param_frame, text="Connection Parameters", font=("Arial", 16))
+        self.conn_param_label.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="")
+
+        # Entry fields and their initial values
+        self.entries = {
+            'Device Address': ('addr', 1),
+            'Username': ('user', 2),
+            'Password': ('pass', 3),
+            'Port': ('port', 4)
+        }
+
+        for placeholder, (cfg_key, row) in self.entries.items():
+            show_char = '*' if cfg_key == 'pass' else None
+            entry = ctk.CTkEntry(self.conn_param_frame, placeholder_text=placeholder, show=show_char)
+            if self.cfg[cfg_key]:
+                entry.insert(0, self.cfg[cfg_key])
+            entry.grid(row=row, column=0, pady=10, padx=20, sticky="ew")
+
+        self.ssh_agent = ctk.CTkSwitch(self.conn_param_frame, text="SSH Agent")
+        self.ssh_agent.grid(row=5, column=0, pady=10, padx=20, sticky="n")
         if self.cfg['ssh-agent']:
             self.ssh_agent.select()
 
-        self.save_connection_parameters_button =  ctk.CTkButton(self.connection_parameters_frame, command=self.save_connection_parameters, text="Save Parameters")
-        self.save_connection_parameters_button.grid(row=9, column=2, pady=(10,0), padx=20, sticky="n")
+        self.save_button = ctk.CTkButton(self.conn_param_frame, command=self.save_params, text="Save")
+        self.save_button.grid(row=6, column=0, pady=10, padx=20, sticky="ew")
 
         # set default values
         self.set_system_theme()
@@ -328,7 +326,7 @@ class App(ctk.CTk):
                 xmlOutput.write(self.textbox.get('1.0', END))
 
     #CONNECTION PARAMETERS METHODS
-    def save_connection_parameters(self):
+    def save_params(self):
         if self.address.get() == "" or self.port_select.get() == "" or self.username.get()=="" or self.password.get()=="":
             self.error("Connection parameters cannot be empty!")
             return
