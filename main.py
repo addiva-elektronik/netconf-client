@@ -40,12 +40,14 @@ class ConfigManager:
     def __init__(self, filename='.netconf_config.json'):
         self.filename = filename
         self.filepath = self._get_file()
-        self.cfg = {
+        self.default_cfg = {
             'addr': '',
             'port': 830,
             'user': 'admin',
-            'pass': ''
+            'pass': '',
+            'ssh-agent': True
         }
+        self.cfg = self.default_cfg.copy()
         self.load()
 
     def _get_file(self):
@@ -60,6 +62,13 @@ class ConfigManager:
         if os.path.exists(self.filepath):
             with open(self.filepath, 'r') as file:
                 self.cfg = json.load(file)
+        # Merge default config with loaded config
+        self._merge_defaults()
+
+    def _merge_defaults(self):
+        for key, value in self.default_cfg.items():
+            if key not in self.cfg:
+                self.cfg[key] = value
 
 class NetconfConnection:
     def __init__(self, cfg, app):
@@ -74,7 +83,7 @@ class NetconfConnection:
                                            username=self.cfg['user'],
                                            password=self.cfg['pass'],
                                            hostkey_verify=False,
-                                           allow_agent=False,
+                                           allow_agent=self.cfg['ssh-agent'],
                                            timeout=30)
             self.app.status("Connected to NETCONF server")
             return self.manager
@@ -194,6 +203,10 @@ class App(ctk.CTk):
         self.port_select.grid(row=4, column=2, pady=10, padx=20, sticky="n")
         if self.cfg['port']:
             self.port_select.insert(0, self.cfg['port'])
+        self.ssh_agent = ctk.CTkSwitch(self.connection_parameters_frame, text="SSH Agent")
+        self.ssh_agent.grid(row=5, column=2, pady=10, padx=20, sticky="n")
+        if self.cfg['ssh-agent']:
+            self.ssh_agent.select()
 
         self.save_connection_parameters_button =  ctk.CTkButton(self.connection_parameters_frame, command=self.save_connection_parameters, text="Save Parameters")
         self.save_connection_parameters_button.grid(row=9, column=2, pady=(10,0), padx=20, sticky="n")
@@ -328,6 +341,7 @@ class App(ctk.CTk):
         self.cfg['port'] = self.port_select.get()
         self.cfg['user'] = self.username.get()
         self.cfg['pass'] = self.password.get()
+        self.cfg['ssh-agent'] = self.ssh_agent.get()
         self.cfg_mgr.save()
 
         self.status("Connection parameters updated.")
