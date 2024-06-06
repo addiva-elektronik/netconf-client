@@ -178,24 +178,30 @@ class App(ctk.CTk):
                                       text="Set System Time")
         self.time_set.grid(row=3, column=0, padx=20, pady=10)
 
-        self.profinet_label = ctk.CTkLabel(self.sidebar_frame,
-                                           text="Profinet Status:", anchor="w")
-        self.profinet_label.grid(row=4, column=0, padx=20, pady=(30, 0))
-        self.profinet_button = ctk.CTkOptionMenu(self.sidebar_frame,
-                                                 command=self.profinet_func,
-                                                 values=["Enable",
-                                                         "Disable"])
-        self.profinet_button.grid(row=5, column=0, padx=20, pady=0)
+        self.get_oper = ctk.CTkButton(self.sidebar_frame,
+                                      command=self.get_oper_func,
+                                      text="Get Status")
+        self.get_oper.grid(row=4, column=0, padx=20, pady=10)
 
         self.get_config_label = ctk.CTkLabel(self.sidebar_frame,
                                              text="Get configuration",
                                              anchor="w")
-        self.get_config_label.grid(row=6, column=0, padx=20, pady=(30, 0))
+        self.get_config_label.grid(row=5, column=0, padx=20, pady=(30, 0))
         self.get_config_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                    command=self.get_config_func,
                                                    values=["Running",
                                                            "Startup"])
-        self.get_config_button.grid(row=7, column=0, padx=20, pady=0)
+        self.get_config_button.grid(row=6, column=0, padx=20, pady=0)
+
+        self.profinet_label = ctk.CTkLabel(self.sidebar_frame,
+                                           text="PROFINET Configuration",
+                                           anchor="w")
+        self.profinet_label.grid(row=7, column=0, padx=20, pady=(30, 0))
+        self.profinet_button = ctk.CTkOptionMenu(self.sidebar_frame,
+                                                 command=self.profinet_func,
+                                                 values=["Enable",
+                                                         "Disable"])
+        self.profinet_button.grid(row=8, column=0, padx=20, pady=0)
 
         # create textbox
         self.textbox = ctk.CTkTextbox(self, width=250)
@@ -451,6 +457,39 @@ class App(ctk.CTk):
                 self.show(str(dom.toprettyxml()))
             except Exception as err:
                 self.error(f"Failed fetching configuration: {err}")
+                print(err)
+
+    # Operational method(s)
+    def get_oper_func(self):
+        """Fetch operational data"""
+        nc_filter = """
+        <filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
+                <interface>
+                    <name/>
+                    <statistics/>
+                </interface>
+            </interfaces>
+            <system xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+                <clock/>
+                <hostname/>
+                <contact/>
+                <location/>
+                <platform/>
+                <uptime/>
+            </system>
+        </filter>
+        """
+
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
+                result = m.get(nc_filter)
+                dom = parseString(result.xml)
+                self.show(str(dom.toprettyxml()))
+            except Exception as err:
+                self.error(f"Failed fetching operational: {err}")
                 print(err)
 
     # REBOOT METHODS
