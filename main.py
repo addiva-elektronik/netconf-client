@@ -161,16 +161,16 @@ class App(customtkinter.CTk):
         self.getconfiguraiton_button = customtkinter.CTkOptionMenu(self.sidebar_frame, command=self.getconfiguration_func, values=["Running","Startup"])
         self.getconfiguraiton_button.grid(row=7, column=0, padx=20, pady=0)
 
-        self.execute_command_button = customtkinter.CTkButton(master=self, fg_color="transparent", text="Send",border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
-        self.execute_command_button.grid(row=3, column=3, padx=(20, 20), pady=(20, 20), sticky="nsew")
-
         # create textbox
         self.textbox = customtkinter.CTkTextbox(self, width=250)
-        self.textbox.grid(row=0, column=1, rowspan=3, padx=(20, 0), pady=(20, 0), sticky="nsew")
+        self.textbox.grid(row=0, column=1, columnspan=2, rowspan=3, padx=(20, 0), pady=(20, 0), sticky="nsew")
 
         self.status_label = customtkinter.CTkLabel(self, anchor="w")
-        self.status_label.grid(row=3, column=1, columnspan=2, padx=(20, 0), pady=(0, 0), sticky="we")
+        self.status_label.grid(row=3, column=1, columnspan=1, padx=(20, 0), pady=(0, 0), sticky="we")
         self.status("Ready")
+
+        self.send_button = customtkinter.CTkButton(master=self, fg_color="transparent", text="Send", border_width=2, text_color=("gray10", "#DCE4EE"), command=self.execute_netconf_command)
+        self.send_button.grid(row=3, column=2, padx=(20, 0), pady=(20, 20), sticky="nsew")
 
         # create radiobutton frame
         self.connection_parameters_frame = customtkinter.CTkFrame(self)
