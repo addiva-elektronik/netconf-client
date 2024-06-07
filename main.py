@@ -9,11 +9,18 @@ import sys
 import subprocess
 import datetime
 import platform
+import concurrent.futures
+import functools
+import http.server
+import socket
+import time
 from enum import Enum
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, FLAT, filedialog, PhotoImage
+from tkinter import Menu, END, FLAT, filedialog, PhotoImage, Toplevel, Label, Button
+from tkinter.ttk import Progressbar
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
+import netifaces
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
 from ncclient.xml_ import to_ele
@@ -46,6 +53,31 @@ RPC_GET_OPER = """<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
     </system>
 </filter>
 """
+
+SRVPORT = 8008
+BUNDLEDIR = os.path.join(os.path.dirname(__file__), "bundles")
+PKGPATH = os.path.join(BUNDLEDIR, "package")
+
+
+class FileServer(http.server.HTTPServer):
+    class RequestHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(*args, **kwargs):
+            pass
+
+    address_family = socket.AF_INET6
+
+    def __init__(self, server_address, directory):
+        rh = functools.partial(FileServer.RequestHandler, directory=directory)
+        self.__tp = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        super().__init__(server_address, rh)
+
+    def __enter__(self):
+        self.__tp.submit(self.serve_forever)
+        return self
+
+    def __exit__(self, _, __, ___):
+        self.shutdown()
+        self.__tp.shutdown()
 
 
 class ConfigManager:
@@ -230,6 +262,11 @@ class App(ctk.CTk):
                                                  values=["Enable",
                                                          "Disable"])
         self.profinet_button.grid(row=8, column=0, padx=20, pady=0)
+
+        self.upgrade_button = ctk.CTkButton(self.sidebar_frame,
+                                            command=self.upgrade_cb,
+                                            text="Upgrade System")
+        self.upgrade_button.grid(row=9, column=0, padx=20, pady=10)
 
         # create textbox
         self.textbox = ctk.CTkTextbox(self, width=250)
@@ -636,6 +673,88 @@ class App(ctk.CTk):
             except Exception as err:
                 self.error(f"{err}")
                 print(err)
+
+    # UPGRADE METHODS
+    def upgrade_cb(self):
+        self.upgrade_file = filedialog.askopenfilename(title="Select Upgrade Image", filetypes=[("Package", "*.pkg")])
+        if not self.upgrade_file:
+            self.error("No upgrade image selected!")
+            return
+        
+        # Start the upgrade process
+        self.start_upgrade()
+
+    def start_upgrade(self):
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+
+            # Set up file server
+            with FileServer(("::", SRVPORT), BUNDLEDIR) as server:
+                # Create a symbolic link to the selected upgrade file
+                try:
+                    os.unlink(PKGPATH)
+                except FileNotFoundError:
+                    pass
+                os.symlink(self.upgrade_file, PKGPATH)
+
+                # Get host IP address
+                host_ip = netifaces.ifaddresses('eth0')[netifaces.AF_INET6][0]['addr']
+                host_ip = host_ip.split('%')[0]  # Remove the interface identifier
+
+                # Start the upgrade RPC call
+                url = f"http://[{host_ip}]:{SRVPORT}/package"
+                self.execute_upgrade_rpc(m, url)
+
+                # Show upgrade progress
+                self.show_upgrade_progress(m)
+
+    def execute_upgrade_rpc(self, m, url):
+        rpc = f"""
+        <rpc message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <install-bundle xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+                <url>{url}</url>
+            </install-bundle>
+        </rpc>
+        """
+        try:
+            response = m.dispatch(to_ele(rpc))
+            self.show(response)
+        except Exception as err:
+            self.error(f"Failed to start upgrade: {err}")
+            print(err)
+
+    def show_upgrade_progress(self, m):
+        self.progress_window = Toplevel(self)
+        self.progress_window.title("Upgrade Progress")
+
+        self.progress_label = Label(self.progress_window, text="Upgrade in progress...")
+        self.progress_label.pack(pady=10)
+
+        self.progress_bar = Progressbar(self.progress_window, length=300, mode='determinate')
+        self.progress_bar.pack(pady=10)
+
+        self.update_progress(m)
+
+    def update_progress(self, m):
+        try:
+            oper = m.get(filter=("subtree", "<system-state xmlns='urn:ietf:params:xml:ns:yang:ietf-system'/>"))
+            installer = oper.data.find(".//{urn:ietf:params:xml:ns:yang:ietf-system}installer")
+            operation = installer.find(".//{urn:ietf:params:xml:ns:yang:ietf-system}operation").text
+            if operation == "idle":
+                last_error = installer.find(".//{urn:ietf:params:xml:ns:yang:ietf-system}last-error")
+                if last_error is not None:
+                    self.progress_label.config(text=f"Upgrade failed: {last_error.text}")
+                    self.progress_bar.stop()
+                else:
+                    self.progress_label.config(text="Upgrade succeeded!")
+                    self.progress_bar.stop()
+            else:
+                self.progress_bar.step(1)
+                self.after(1000, self.update_progress, m)
+        except Exception as err:
+            self.error(f"Failed to get upgrade status: {err}")
+            print(err)
 
     # NETCONF COMMANDS METHODS
     def execute_netconf_command(self):
