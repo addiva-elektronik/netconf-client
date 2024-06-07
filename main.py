@@ -11,7 +11,8 @@ import datetime
 import platform
 from enum import Enum
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, FLAT, filedialog
+from tkinter import Menu, END, FLAT, filedialog, PhotoImage
+from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
@@ -129,6 +130,9 @@ class App(ctk.CTk):
         self.theme_var = ctk.StringVar(value=self.cfg['theme'])
         self.zoom_var = ctk.StringVar(value=self.cfg['zoom'])
 
+        # Load icons
+        self.load_icons()
+
         # configure grid layout (4x4)
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure((2, 3), weight=0)
@@ -137,42 +141,47 @@ class App(ctk.CTk):
         self.menubar = Menu(self, tearoff=0, bd=0)
         self.config(menu=self.menubar)
 
-        settings_menu = Menu(self.menubar, tearoff=0)
-        file_menu = Menu(self.menubar, tearoff=0)
+        self.settings_menu = Menu(self.menubar, tearoff=0)
+        self.file_menu = Menu(self.menubar, tearoff=0)
 
-        settings_menu.add_radiobutton(label="System", variable=self.theme_var,
-                                      command=lambda: self.change_theme_mode_event("System"))
-        settings_menu.add_radiobutton(label="Light", variable=self.theme_var,
-                                      command=lambda: self.change_theme_mode_event("Light"))
-        settings_menu.add_radiobutton(label="Dark", variable=self.theme_var,
-                                      command=lambda: self.change_theme_mode_event("Dark"))
+        self.settings_menu.add_radiobutton(label="System", variable=self.theme_var,
+                                           command=lambda: self.change_theme_mode_event("System"))
+        self.settings_menu.add_radiobutton(label="Light", variable=self.theme_var,
+                                           command=lambda: self.change_theme_mode_event("Light"))
+        self.settings_menu.add_radiobutton(label="Dark", variable=self.theme_var,
+                                           command=lambda: self.change_theme_mode_event("Dark"))
 
-        settings_menu.add_separator()
+        self.settings_menu.add_separator()
 
-        settings_menu.add_command(label="Zoom In", accelerator="Ctrl++",
-                                  command=self.zoom_in_event)
+        self.settings_menu.add_command(label="Zoom In", accelerator="Ctrl++",
+                                       command=self.zoom_in_event)
         self.bind_all("<Control-plus>", lambda event: self.zoom_in_event())
 
-        settings_menu.add_command(label="Zoom Out", accelerator="Ctrl+-",
-                                  command=self.zoom_out_event)
+        self.settings_menu.add_command(label="Zoom Out", accelerator="Ctrl+-",
+                                       command=self.zoom_out_event)
         self.bind_all("<Control-minus>", lambda event: self.zoom_out_event())
 
-        file_menu.add_command(label="Open", underline=0,
-                              accelerator="Ctrl+O",
-                              command=self.open_file)
+        self.file_menu.add_command(label="Open", underline=0,
+                                   accelerator="Ctrl+O",
+                                   command=self.open_file,
+                                   image=self.load_icon, compound="left")
         self.bind_all("<Control-o>", lambda event: self.open_file)
-        file_menu.add_command(label="Save", underline=0,
-                              accelerator="Ctrl+S",
-                              command=self.save_file)
+        self.file_menu.add_command(label="Save", underline=0,
+                                   accelerator="Ctrl+S",
+                                   command=self.save_file,
+                                   image=self.save_icon, compound="left")
         self.bind_all("<Control-s>", lambda event: self.save_file)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", underline=0,
-                              accelerator="Ctrl+Q",
-                              command=self.quit)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", underline=0,
+                                   accelerator="Ctrl+Q",
+                                   command=self.quit,
+                                   image=self.exit_icon, compound="left")
         self.bind_all("<Control-q>", lambda event: self.quit())
 
-        self.menubar.add_cascade(label="File", underline=0, menu=file_menu)
-        self.menubar.add_cascade(label="Settings", underline=0, menu=settings_menu)
+        self.menubar.add_cascade(label="File", underline=0, menu=self.file_menu)
+        self.menubar.add_cascade(label="Settings", underline=0, menu=self.settings_menu)
+
+        self.update_menu_icons()
 
         # create sidebar frame with widgets
         self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
@@ -284,6 +293,64 @@ class App(ctk.CTk):
         self.textbox.insert("0.0", "XML Command Goes here!")
 
     # UI METHODS
+    def load_icons(self):
+        self.icon_images = {
+            'save': Image.open("icons/save.png"),
+            'load': Image.open("icons/open.png"),
+            'exit': Image.open("icons/close.png")
+        }
+        self.icons = {
+            'save': ImageTk.PhotoImage(self.icon_images['save']),
+            'load': ImageTk.PhotoImage(self.icon_images['load']),
+            'exit': ImageTk.PhotoImage(self.icon_images['exit'])
+        }
+        self.load_icon = self.icons['load']
+        self.save_icon = self.icons['save']
+        self.exit_icon = self.icons['exit']
+
+    def update_menu_icons(self):
+        if ctk.get_appearance_mode() == "Dark":
+            color = "white"
+        else:
+            color = "black"
+
+        load_icon = self.change_icon_color(self.icon_images['load'], color)
+        save_icon = self.change_icon_color(self.icon_images['save'], color)
+        exit_icon = self.change_icon_color(self.icon_images['exit'], color)
+
+        self.file_menu.entryconfig(0, image=load_icon)
+        self.file_menu.entryconfig(1, image=save_icon)
+        self.file_menu.entryconfig(3, image=exit_icon)
+
+        # Keep a reference to prevent garbage collection
+        self.load_icon = load_icon
+        self.save_icon = save_icon
+        self.exit_icon = exit_icon
+
+    def change_icon_color(self, image, color):
+        # Convert the color to RGBA
+        r, g, b = Image.new("RGB", (1, 1), color).getpixel((0, 0))
+        color = (r, g, b, 255)
+
+        # Create a new image with the same size and an RGBA mode
+        new_image = Image.new("RGBA", image.size)
+
+        # Get the pixel data from the original image
+        pixels = image.getdata()
+
+        # Process each pixel
+        new_pixels = []
+        for pixel in pixels:
+            if pixel[3] > 0:  # If not transparent
+                new_pixels.append(color)  # Change to the new color
+            else:
+                new_pixels.append(pixel)  # Preserve transparency
+
+        new_image.putdata(new_pixels)
+
+        # Convert to PhotoImage
+        return ImageTk.PhotoImage(new_image)
+
     def get_system_theme(self):
         try:
             # Check for dark mode on Linux Mint using gsettings
@@ -386,6 +453,7 @@ class App(ctk.CTk):
             theme = self.get_system_theme()
         ctk.set_appearance_mode(theme)
         self.update_menu_colors()
+        self.update_menu_icons()
 
     def change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
