@@ -706,20 +706,30 @@ class App(ctk.CTk):
                 pkg_path = os.path.join(temp_dir, "package.pkg")
                 os.symlink(self.upgrade_file, pkg_path)
 
-                with FileServer(("::", SRVPORT), temp_dir) as server:
-                    # Get host IP address
-                    if platform.system() == "Windows":
-                        host_ip = socket.gethostbyname(socket.gethostname())
-                    else:
-                        host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET6][0]['addr']
-                        host_ip = host_ip.split('%')[0]  # Remove the interface identifier
+                # Detect if IPv6 is supported and use it, otherwise fall back to IPv4
+                try:
+                    with FileServer(("::", SRVPORT), temp_dir) as server:
+                        if platform.system() == "Windows":
+                            host_ip = socket.gethostbyname(socket.gethostname())
+                        else:
+                            host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET6][0]['addr']
+                            host_ip = host_ip.split('%')[0]  # Remove the interface identifier
 
-                    # Start the upgrade RPC call
-                    url = f"http://[{host_ip}]:{SRVPORT}/package.pkg"
-                    self.execute_upgrade_rpc(m, url)
+                        url = f"http://[{host_ip}]:{SRVPORT}/package.pkg"
+                except socket.gaierror:
+                    with FileServer(("0.0.0.0", SRVPORT), temp_dir) as server:
+                        if platform.system() == "Windows":
+                            host_ip = socket.gethostbyname(socket.gethostname())
+                        else:
+                            host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET][0]['addr']
 
-                    # Show upgrade progress
-                    self.show_upgrade_progress(m)
+                        url = f"http://{host_ip}:{SRVPORT}/package.pkg"
+
+                # Start the upgrade RPC call
+                self.execute_upgrade_rpc(m, url)
+
+                # Show upgrade progress
+                self.show_upgrade_progress(m)
 
     def execute_upgrade_rpc(self, m, url):
         rpc = f"""
