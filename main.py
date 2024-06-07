@@ -13,6 +13,7 @@ import concurrent.futures
 import functools
 import http.server
 import socket
+import tempfile
 import time
 from enum import Enum
 from xml.dom.minidom import parseString
@@ -55,16 +56,12 @@ RPC_GET_OPER = """<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
 """
 
 SRVPORT = 8008
-BUNDLEDIR = os.path.join(os.path.dirname(__file__), "bundles")
-PKGPATH = os.path.join(BUNDLEDIR, "package")
 
 
 class FileServer(http.server.HTTPServer):
     class RequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(*args, **kwargs):
             pass
-
-    address_family = socket.AF_INET6
 
     def __init__(self, server_address, directory):
         rh = functools.partial(FileServer.RequestHandler, directory=directory)
@@ -676,11 +673,11 @@ class App(ctk.CTk):
 
     # UPGRADE METHODS
     def upgrade_cb(self):
-        self.upgrade_file = filedialog.askopenfilename(title="Select Upgrade Image", filetypes=[("Package", "*.pkg")])
+        self.upgrade_file = filedialog.askopenfilename(title="Select Upgrade Image", filetypes=[("Upgrade Package", "*.pkg")])
         if not self.upgrade_file:
             self.error("No upgrade image selected!")
             return
-        
+
         # Start the upgrade process
         self.start_upgrade()
 
@@ -689,30 +686,30 @@ class App(ctk.CTk):
             if m is None:
                 return
 
-            # Set up file server
-            with FileServer(("::", SRVPORT), BUNDLEDIR) as server:
-                # Create a symbolic link to the selected upgrade file
-                try:
-                    os.unlink(PKGPATH)
-                except FileNotFoundError:
-                    pass
-                os.symlink(self.upgrade_file, PKGPATH)
+            # Set up temporary directory and file server
+            with tempfile.TemporaryDirectory() as temp_dir:
+                pkg_path = os.path.join(temp_dir, "package.pkg")
+                os.symlink(self.upgrade_file, pkg_path)
 
-                # Get host IP address
-                host_ip = netifaces.ifaddresses('eth0')[netifaces.AF_INET6][0]['addr']
-                host_ip = host_ip.split('%')[0]  # Remove the interface identifier
+                with FileServer(("::", SRVPORT), temp_dir) as server:
+                    # Get host IP address
+                    if platform.system() == "Windows":
+                        host_ip = socket.gethostbyname(socket.gethostname())
+                    else:
+                        host_ip = netifaces.ifaddresses('eth0')[netifaces.AF_INET6][0]['addr']
+                        host_ip = host_ip.split('%')[0]  # Remove the interface identifier
 
-                # Start the upgrade RPC call
-                url = f"http://[{host_ip}]:{SRVPORT}/package"
-                self.execute_upgrade_rpc(m, url)
+                    # Start the upgrade RPC call
+                    url = f"http://[{host_ip}]:{SRVPORT}/package.pkg"
+                    self.execute_upgrade_rpc(m, url)
 
-                # Show upgrade progress
-                self.show_upgrade_progress(m)
+                    # Show upgrade progress
+                    self.show_upgrade_progress(m)
 
     def execute_upgrade_rpc(self, m, url):
         rpc = f"""
         <rpc message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-            <install-bundle xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
+            <install-bundle xmlns="urn:infix:system:ns:yang:1.0">
                 <url>{url}</url>
             </install-bundle>
         </rpc>
@@ -738,11 +735,11 @@ class App(ctk.CTk):
 
     def update_progress(self, m):
         try:
-            oper = m.get(filter=("subtree", "<system-state xmlns='urn:ietf:params:xml:ns:yang:ietf-system'/>"))
-            installer = oper.data.find(".//{urn:ietf:params:xml:ns:yang:ietf-system}installer")
-            operation = installer.find(".//{urn:ietf:params:xml:ns:yang:ietf-system}operation").text
+            oper = m.get(filter=("subtree", "<system-state xmlns='urn:infix:system:ns:yang:1.0'/>"))
+            installer = oper.data.find(".//{urn:infix:system:ns:yang:1.0}installer")
+            operation = installer.find(".//{urn:infix:system:ns:yang:1.0}operation").text
             if operation == "idle":
-                last_error = installer.find(".//{urn:ietf:params:xml:ns:yang:ietf-system}last-error")
+                last_error = installer.find(".//{urn:infix:system:ns:yang:1.0}last-error")
                 if last_error is not None:
                     self.progress_label.config(text=f"Upgrade failed: {last_error.text}")
                     self.progress_bar.stop()
