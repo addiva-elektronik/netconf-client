@@ -192,15 +192,6 @@ class App(ctk.CTk):
                                        command=self.zoom_out_event)
         self.bind_all("<Control-minus>", lambda event: self.zoom_out_event())
 
-        if platform.system() != "Windows":
-            self.interface_label = ctk.CTkLabel(self.settings_menu, text="Interface")
-            self.interface_label.pack()
-            self.interface_entry = ctk.CTkEntry(self.settings_menu)
-            self.interface_entry.insert(0, self.cfg['interface'])
-            self.interface_entry.pack()
-            self.interface_save_button = ctk.CTkButton(self.settings_menu, text="Save Interface", command=self.save_interface)
-            self.interface_save_button.pack()
-
         self.file_menu.add_command(label="Open", underline=0,
                                    accelerator="Ctrl+O",
                                    command=self.open_file,
@@ -327,6 +318,21 @@ class App(ctk.CTk):
         self.save_button = ctk.CTkButton(self.conn_param_frame,
                                          command=self.save_params, text="Save")
         self.save_button.grid(row=6, column=0, pady=10, padx=20, sticky="ew")
+
+        # Interface Configuration frame (for non-Windows platforms)
+        if platform.system() != "Windows":
+            self.interface_frame = ctk.CTkFrame(self)
+            self.interface_frame.grid(row=1, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
+
+            self.interface_label = ctk.CTkLabel(self.interface_frame, text="Interface")
+            self.interface_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+            self.interface_entry = ctk.CTkEntry(self.interface_frame)
+            self.interface_entry.insert(0, self.cfg['interface'])
+            self.interface_entry.grid(row=1, column=0, pady=10, padx=20, sticky="ew")
+
+            self.interface_save_button = ctk.CTkButton(self.interface_frame, text="Save Interface", command=self.save_interface)
+            self.interface_save_button.grid(row=2, column=0, pady=10, padx=20, sticky="ew")
 
         # Check if theme is set to "System", otherwise use saved theme
         self.change_theme_mode_event(self.cfg['theme'])
