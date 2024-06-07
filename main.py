@@ -10,6 +10,7 @@ import subprocess
 import datetime
 import platform
 import concurrent.futures
+import threading
 import functools
 import http.server
 import socket
@@ -17,7 +18,7 @@ import tempfile
 import time
 from enum import Enum
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, FLAT, filedialog, PhotoImage, Toplevel, Label, Button
+from tkinter import Menu, END, FLAT, filedialog, PhotoImage, Toplevel, Label, Button, messagebox
 from tkinter.ttk import Progressbar
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
@@ -89,7 +90,7 @@ class ConfigManager:
             'ssh-agent': True,
             'theme': "System",
             'zoom': "100%",
-            'interface': 'eth0'
+            'interface': 'virbr0'
         }
         self.cfg = self.default_cfg.copy()
         self.load()
@@ -741,7 +742,10 @@ class App(ctk.CTk):
         """
         try:
             response = m.dispatch(to_ele(rpc))
-            self.show(response)
+            if '<ok/>' in response.xml:
+                self.show("Upgrade started successfully.")
+            else:
+                raise Exception("Upgrade RPC did not return <ok/>.")
         except Exception as err:
             self.error(f"Failed to start upgrade: {err}")
             print(err)
@@ -750,33 +754,46 @@ class App(ctk.CTk):
         self.progress_window = Toplevel(self)
         self.progress_window.title("Upgrade Progress")
 
-        self.progress_label = Label(self.progress_window, text="Upgrade in progress...")
+        self.progress_label = ctk.CTkLabel(self.progress_window, text="Upgrade in progress...")
         self.progress_label.pack(pady=10)
 
-        self.progress_bar = Progressbar(self.progress_window, length=300, mode='determinate')
+        self.progress_bar = ctk.CTkProgressBar(self.progress_window, length=300, mode='determinate')
         self.progress_bar.pack(pady=10)
+        self.progress_bar.set(0)
 
-        self.update_progress(m)
+        self.progress_window.transient(self)  # Set to be on top of the main window
+        self.progress_window.grab_set()  # Make it modal
+        self.progress_window.protocol("WM_DELETE_WINDOW", self.disable_event)  # Disable the close button
+
+        threading.Thread(target=self.update_progress, args=(m,), daemon=True).start()
+
+    def disable_event(self):
+        pass
 
     def update_progress(self, m):
         try:
-            oper = m.get(filter=("subtree", "<system-state xmlns='urn:infix:system:ns:yang:1.0'/>"))
-            installer = oper.data.find(".//{urn:infix:system:ns:yang:1.0}installer")
-            operation = installer.find(".//{urn:infix:system:ns:yang:1.0}operation").text
-            if operation == "idle":
-                last_error = installer.find(".//{urn:infix:system:ns:yang:1.0}last-error")
-                if last_error is not None:
-                    self.progress_label.config(text=f"Upgrade failed: {last_error.text}")
-                    self.progress_bar.stop()
+            while True:
+                oper = m.get(filter=("subtree", "<system-state xmlns='urn:infix:system:ns:yang:1.0'/>"))
+                installer = oper.data.find(".//{urn:infix:system:ns:yang:1.0}installer")
+                operation = installer.find(".//{urn:infix:system:ns:yang:1.0}operation").text
+                if operation == "idle":
+                    last_error = installer.find(".//{urn:infix:system:ns:yang:1.0}last-error")
+                    if last_error is not None:
+                        self.progress_label.config(text=f"Upgrade failed: {last_error.text}")
+                        self.progress_bar.stop()
+                    else:
+                        self.progress_label.config(text="Upgrade succeeded!")
+                        self.progress_bar.set(1)
+                    break
                 else:
-                    self.progress_label.config(text="Upgrade succeeded!")
-                    self.progress_bar.stop()
-            else:
-                self.progress_bar.step(1)
-                self.after(1000, self.update_progress, m)
+                    self.progress_bar.step(0.05)
+                    time.sleep(1)
         except Exception as err:
             self.error(f"Failed to get upgrade status: {err}")
             print(err)
+        finally:
+            messagebox.showinfo("Upgrade Status", self.progress_label.cget("text"))
+            self.progress_window.destroy()
 
     # NETCONF COMMANDS METHODS
     def execute_netconf_command(self):
