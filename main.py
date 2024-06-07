@@ -88,7 +88,8 @@ class ConfigManager:
             'pass': '',
             'ssh-agent': True,
             'theme': "System",
-            'zoom': "100%"
+            'zoom': "100%",
+            'interface': 'eth0'
         }
         self.cfg = self.default_cfg.copy()
         self.load()
@@ -190,6 +191,15 @@ class App(ctk.CTk):
                                        command=self.zoom_out_event)
         self.bind_all("<Control-minus>", lambda event: self.zoom_out_event())
 
+        if platform.system() != "Windows":
+            self.interface_label = ctk.CTkLabel(self.settings_menu, text="Interface")
+            self.interface_label.pack()
+            self.interface_entry = ctk.CTkEntry(self.settings_menu)
+            self.interface_entry.insert(0, self.cfg['interface'])
+            self.interface_entry.pack()
+            self.interface_save_button = ctk.CTkButton(self.settings_menu, text="Save Interface", command=self.save_interface)
+            self.interface_save_button.pack()
+
         self.file_menu.add_command(label="Open", underline=0,
                                    accelerator="Ctrl+O",
                                    command=self.open_file,
@@ -235,35 +245,35 @@ class App(ctk.CTk):
                                       text="Set System Time")
         self.time_set.grid(row=3, column=0, padx=20, pady=10)
 
+        self.upgrade_button = ctk.CTkButton(self.sidebar_frame,
+                                            command=self.upgrade_cb,
+                                            text="Upgrade System")
+        self.upgrade_button.grid(row=4, column=0, padx=20, pady=10)
+
         self.get_oper = ctk.CTkButton(self.sidebar_frame,
                                       command=self.get_oper_cb,
                                       text="Get Status")
-        self.get_oper.grid(row=4, column=0, padx=20, pady=10)
+        self.get_oper.grid(row=5, column=0, padx=20, pady=10)
 
         self.get_config_label = ctk.CTkLabel(self.sidebar_frame,
                                              text="Get configuration",
                                              anchor="w")
-        self.get_config_label.grid(row=5, column=0, padx=20, pady=(30, 0))
+        self.get_config_label.grid(row=6, column=0, padx=20, pady=(30, 0))
         self.get_config_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                    command=self.get_config_cb,
                                                    values=["Running",
                                                            "Startup"])
-        self.get_config_button.grid(row=6, column=0, padx=20, pady=0)
+        self.get_config_button.grid(row=7, column=0, padx=20, pady=0)
 
         self.profinet_label = ctk.CTkLabel(self.sidebar_frame,
                                            text="PROFINET Configuration",
                                            anchor="w")
-        self.profinet_label.grid(row=7, column=0, padx=20, pady=(30, 0))
+        self.profinet_label.grid(row=8, column=0, padx=20, pady=(30, 0))
         self.profinet_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                  command=self.profinet_cb,
                                                  values=["Enable",
                                                          "Disable"])
-        self.profinet_button.grid(row=8, column=0, padx=20, pady=0)
-
-        self.upgrade_button = ctk.CTkButton(self.sidebar_frame,
-                                            command=self.upgrade_cb,
-                                            text="Upgrade System")
-        self.upgrade_button.grid(row=9, column=0, padx=20, pady=10)
+        self.profinet_button.grid(row=9, column=0, padx=20, pady=0)
 
         # create textbox
         self.textbox = ctk.CTkTextbox(self, width=250)
@@ -560,6 +570,11 @@ class App(ctk.CTk):
             return True
         return False
 
+    def save_interface(self):
+        self.cfg['interface'] = self.interface_entry.get()
+        self.cfg_mgr.save()
+        self.status("Interface updated.")
+
     # PROFINET STATUS METHODS
     def _full_path(self, relative_path):
         """Local helper function to get full file path"""
@@ -696,7 +711,7 @@ class App(ctk.CTk):
                     if platform.system() == "Windows":
                         host_ip = socket.gethostbyname(socket.gethostname())
                     else:
-                        host_ip = netifaces.ifaddresses('eth0')[netifaces.AF_INET6][0]['addr']
+                        host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET6][0]['addr']
                         host_ip = host_ip.split('%')[0]  # Remove the interface identifier
 
                     # Start the upgrade RPC call
