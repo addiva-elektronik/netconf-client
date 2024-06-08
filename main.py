@@ -6,20 +6,21 @@ Copyright (c) 2024 Ejub Šabić <ejub1946@outlook.com>
 import os
 import json
 import sys
+import argparse
 import subprocess
+import functools
 import datetime
 import platform
-import concurrent.futures
-import threading
-import functools
 import http.server
+import socketserver
 import socket
+import logging
 import tempfile
+import threading
 import time
 from enum import Enum
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, FLAT, filedialog, PhotoImage, Toplevel, Label, Button, messagebox
-from tkinter.ttk import Progressbar
+from tkinter import Menu, END, filedialog, messagebox
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
 import netifaces
@@ -56,28 +57,6 @@ RPC_GET_OPER = """<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
 </filter>
 """
 
-SRVPORT = 8008
-
-
-class FileServer(http.server.HTTPServer):
-    class RequestHandler(http.server.SimpleHTTPRequestHandler):
-        def log_message(*args, **kwargs):
-            pass
-
-    def __init__(self, server_address, directory):
-        rh = functools.partial(FileServer.RequestHandler, directory=directory)
-        self.__tp = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        super().__init__(server_address, rh)
-
-    def __enter__(self):
-        self.__tp.submit(self.serve_forever)
-        return self
-
-    def __exit__(self, _, __, ___):
-        self.shutdown()
-        self.__tp.shutdown()
-
-
 class ConfigManager:
     def __init__(self, filename='.netconf_config.json'):
         self.filename = filename
@@ -90,7 +69,9 @@ class ConfigManager:
             'ssh-agent': True,
             'theme': "System",
             'zoom': "100%",
-            'interface': 'virbr0'
+            'interface': 'virbr0',
+            'server_directory': '',
+            'server_port': 8008
         }
         self.cfg = self.default_cfg.copy()
         self.load()
@@ -319,29 +300,80 @@ class App(ctk.CTk):
                                          command=self.save_params, text="Save")
         self.save_button.grid(row=6, column=0, pady=10, padx=20, sticky="ew")
 
-        # Interface Configuration frame (for non-Windows platforms)
-        if platform.system() != "Windows":
-            self.interface_frame = ctk.CTkFrame(self)
-            self.interface_frame.grid(row=1, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
+        # Web Server Settings frame
+        self.web_server_frame = ctk.CTkFrame(self)
+        self.web_server_frame.grid(row=1, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
 
-            self.interface_label = ctk.CTkLabel(self.interface_frame, text="Interface")
-            self.interface_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.web_server_label = ctk.CTkLabel(self.web_server_frame, text="Web Server Settings")
+        self.web_server_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-            self.interface_entry = ctk.CTkEntry(self.interface_frame)
-            self.interface_entry.insert(0, self.cfg['interface'])
-            self.interface_entry.grid(row=1, column=0, pady=10, padx=20, sticky="ew")
+        self.interface_entry = ctk.CTkEntry(self.web_server_frame)
+        self.interface_entry.insert(0, self.cfg['interface'])
+        self.interface_entry.grid(row=1, column=0, pady=10, padx=20, sticky="ew")
 
-            self.interface_save_button = ctk.CTkButton(self.interface_frame, text="Save Interface", command=self.save_interface)
-            self.interface_save_button.grid(row=2, column=0, pady=10, padx=20, sticky="ew")
+        self.directory_button = ctk.CTkButton(self.web_server_frame, text="Select Directory", command=self.select_directory)
+        self.directory_button.grid(row=2, column=0, pady=10, padx=20, sticky="ew")
+
+        self.server_port_entry = ctk.CTkEntry(self.web_server_frame, placeholder_text="Server Port")
+        self.server_port_entry.insert(0, str(self.cfg['server_port']))
+        self.server_port_entry.grid(row=3, column=0, pady=10, padx=20, sticky="ew")
+
+        if self.cfg['server_directory']:
+            self.server_directory = self.cfg['server_directory']
+        else:
+            self.server_directory = tempfile.TemporaryDirectory().name
+
+        self.interface_save_button = ctk.CTkButton(self.web_server_frame, text="Save Settings", command=self.save_server_settings)
+        self.interface_save_button.grid(row=4, column=0, pady=10, padx=20, sticky="ew")
 
         # Check if theme is set to "System", otherwise use saved theme
         self.change_theme_mode_event(self.cfg['theme'])
-        self.change_scaling_event(f"{self.cfg['zoom']}%")
+        self.change_scaling_event(f"{self.cfg['zoom']}")
 
         # set default values
         self.rpc_cb = None
         self.textbox.delete(0.0, 'end')
         self.textbox.insert("0.0", "XML Command Goes here!")
+
+        # Start the web server
+        self.start_file_server()
+
+    def select_directory(self):
+        directory = filedialog.askdirectory(initialdir=self.server_directory)
+        if directory:
+            self.server_directory = directory
+            self.cfg['server_directory'] = self.server_directory
+            self.cfg_mgr.save()
+            self.restart_file_server()
+            self.status(f"Serving files from: {self.server_directory}")
+
+    def save_server_settings(self):
+        self.cfg['interface'] = self.interface_entry.get()
+        self.cfg['server_directory'] = self.server_directory
+        try:
+            self.cfg['server_port'] = int(self.server_port_entry.get())
+        except ValueError:
+            self.error("Invalid server port. Please enter a valid number.")
+            return
+        self.cfg_mgr.save()
+        self.restart_file_server()
+        self.status("Web server settings updated and server restarted.")
+
+    def start_file_server(self):
+        interface = self.cfg['interface']
+        port = self.cfg['server_port']
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=self.server_directory)
+        self.server = socketserver.TCPServer(("", port), handler)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.daemon = True
+        self.server_thread.start()
+        self.status(f"Serving files on {interface}:{port}")
+
+    def restart_file_server(self):
+        if self.server:
+            self.server.shutdown()
+            self.server.server_close()
+        self.start_file_server()
 
     # UI METHODS
     def load_icons(self):
@@ -528,7 +560,8 @@ class App(ctk.CTk):
 
     def open_file(self):
         files = [('XML File', '*.xml')]
-        file = filedialog.askopenfile(filetypes=files, defaultextension=files)
+        file = filedialog.askopenfile(initialdir=self.server_directory,
+                                      filetypes=files, defaultextension=files)
         if file is not None:
             content = file.read()
             self.show(content)
@@ -580,7 +613,8 @@ class App(ctk.CTk):
     def save_interface(self):
         self.cfg['interface'] = self.interface_entry.get()
         self.cfg_mgr.save()
-        self.status("Interface updated.")
+        self.restart_file_server()
+        self.status("Interface updated and web server restarted.")
 
     # PROFINET STATUS METHODS
     def _full_path(self, relative_path):
@@ -694,58 +728,39 @@ class App(ctk.CTk):
                 print(err)
 
     # UPGRADE METHODS
-    def upgrade_cb(self):
-        self.upgrade_file = filedialog.askopenfilename(title="Select Upgrade Image", filetypes=[("Upgrade Package", "*.pkg")])
-        if not self.upgrade_file:
-            self.error("No upgrade image selected!")
-            return
-
-        # Start the upgrade process
-        self.start_upgrade()
-
     def start_upgrade(self):
         with NetconfConnection(self.cfg, self) as m:
             if m is None:
                 return
 
-            # Set up temporary directory and file server
-            with tempfile.TemporaryDirectory() as temp_dir:
-                pkg_path = os.path.join(temp_dir, "package.pkg")
-                os.symlink(self.upgrade_file, pkg_path)
+            if platform.system() == "Windows":
+                host_ip = socket.gethostbyname(socket.gethostname())
+            else:
+                host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET][0]['addr']
 
-                # Detect if IPv6 is supported and use it, otherwise fall back to IPv4
-                try:
-                    with FileServer(("::", SRVPORT), temp_dir) as server:
-                        if platform.system() == "Windows":
-                            host_ip = socket.gethostbyname(socket.gethostname())
-                        else:
-                            host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET6][0]['addr']
-                            host_ip = host_ip.split('%')[0]  # Remove the interface identifier
+            url = f"http://{host_ip}:{self.cfg['server_port']}/{os.path.basename(self.upgrade_file)}"
+            logging.debug(f"Upgrade URL: {url}")
 
-                        url = f"http://[{host_ip}]:{SRVPORT}/package.pkg"
-                except socket.gaierror:
-                    with FileServer(("0.0.0.0", SRVPORT), temp_dir) as server:
-                        if platform.system() == "Windows":
-                            host_ip = socket.gethostbyname(socket.gethostname())
-                        else:
-                            host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET][0]['addr']
+            # Start the upgrade RPC call
+            self.execute_upgrade_rpc(m, url)
 
-                        url = f"http://{host_ip}:{SRVPORT}/package.pkg"
+    # Example usage in App class
+    def upgrade_cb(self):
+        self.upgrade_file = filedialog.askopenfilename(
+            initialdir=self.server_directory,
+            title="Select Upgrade Image",
+            filetypes=[("Upgrade Package", "*.pkg")])
+        if not self.upgrade_file:
+            self.error("No upgrade image selected!")
+            return
 
-                # Start the upgrade RPC call
-                self.execute_upgrade_rpc(m, url)
-
-                # Show upgrade progress
-                self.show_upgrade_progress(m)
+        self.start_upgrade()
 
     def execute_upgrade_rpc(self, m, url):
-        rpc = f"""
-        <rpc message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-            <install-bundle xmlns="urn:infix:system:ns:yang:1.0">
-                <url>{url}</url>
-            </install-bundle>
-        </rpc>
-        """
+        rpc = f"""<install-bundle xmlns="urn:infix:system:ns:yang:1.0">
+    <url>{url}</url>
+</install-bundle>
+"""
         try:
             response = m.dispatch(to_ele(rpc))
             if '<ok/>' in response.xml:
@@ -755,51 +770,6 @@ class App(ctk.CTk):
         except Exception as err:
             self.error(f"Failed to start upgrade: {err}")
             print(err)
-
-    def show_upgrade_progress(self, m):
-        self.progress_window = Toplevel(self)
-        self.progress_window.title("Upgrade Progress")
-
-        self.progress_label = ctk.CTkLabel(self.progress_window, text="Upgrade in progress...")
-        self.progress_label.pack(pady=10)
-
-        self.progress_bar = ctk.CTkProgressBar(self.progress_window, length=300, mode='determinate')
-        self.progress_bar.pack(pady=10)
-        self.progress_bar.set(0)
-
-        self.progress_window.transient(self)  # Set to be on top of the main window
-        self.progress_window.grab_set()  # Make it modal
-        self.progress_window.protocol("WM_DELETE_WINDOW", self.disable_event)  # Disable the close button
-
-        threading.Thread(target=self.update_progress, args=(m,), daemon=True).start()
-
-    def disable_event(self):
-        pass
-
-    def update_progress(self, m):
-        try:
-            while True:
-                oper = m.get(filter=("subtree", "<system-state xmlns='urn:infix:system:ns:yang:1.0'/>"))
-                installer = oper.data.find(".//{urn:infix:system:ns:yang:1.0}installer")
-                operation = installer.find(".//{urn:infix:system:ns:yang:1.0}operation").text
-                if operation == "idle":
-                    last_error = installer.find(".//{urn:infix:system:ns:yang:1.0}last-error")
-                    if last_error is not None:
-                        self.progress_label.config(text=f"Upgrade failed: {last_error.text}")
-                        self.progress_bar.stop()
-                    else:
-                        self.progress_label.config(text="Upgrade succeeded!")
-                        self.progress_bar.set(1)
-                    break
-                else:
-                    self.progress_bar.step(0.05)
-                    time.sleep(1)
-        except Exception as err:
-            self.error(f"Failed to get upgrade status: {err}")
-            print(err)
-        finally:
-            messagebox.showinfo("Upgrade Status", self.progress_label.cget("text"))
-            self.progress_window.destroy()
 
     # NETCONF COMMANDS METHODS
     def execute_netconf_command(self):
@@ -831,6 +801,23 @@ class App(ctk.CTk):
                 print(err)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Simple NETCONF Client")
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    return parser.parse_args()
+
+def setup_logging(debug_enabled):
+    if debug_enabled:
+        logging_level = logging.DEBUG
+    else:
+        logging_level = logging.INFO
+
+    logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
 if __name__ == "__main__":
+    args = parse_args()
+    setup_logging(args.debug)
+
     app = App()
     app.mainloop()
