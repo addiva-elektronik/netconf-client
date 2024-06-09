@@ -15,7 +15,6 @@ import http.server
 import socketserver
 import socket
 import logging
-import tempfile
 import threading
 import time
 from enum import Enum
@@ -23,6 +22,7 @@ from xml.dom.minidom import parseString
 from tkinter import Menu, END, filedialog, messagebox
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
+from customtkinter import CTkImage
 import netifaces
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
@@ -69,8 +69,8 @@ class ConfigManager:
             'ssh-agent': True,
             'theme': "System",
             'zoom': "100%",
-            'interface': 'virbr0',
-            'server_directory': '',
+            'server_iface': 'virbr0',
+            'server_path': '',
             'server_port': 8008
         }
         self.cfg = self.default_cfg.copy()
@@ -195,7 +195,7 @@ class App(ctk.CTk):
 
         self.update_menu_icons()
 
-        # create sidebar frame with widgets
+        # left sidebar with netconf RPCs ######################################
         self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=8, sticky="nsew")
 
@@ -218,6 +218,7 @@ class App(ctk.CTk):
                                       text="Set System Time")
         self.time_set.grid(row=3, column=0, padx=20, pady=10)
 
+        self.upgrade_file = None
         self.upgrade_button = ctk.CTkButton(self.sidebar_frame,
                                             command=self.upgrade_cb,
                                             text="Upgrade System")
@@ -248,10 +249,10 @@ class App(ctk.CTk):
                                                          "Disable"])
         self.profinet_button.grid(row=9, column=0, padx=20, pady=0)
 
-        # create textbox
+        # main XML textbox ####################################################
         self.textbox = ctk.CTkTextbox(self, width=250)
         self.textbox.grid(row=0, column=1, columnspan=2, rowspan=3,
-                          padx=(20, 0), pady=(20, 0), sticky="nsew")
+                          padx=(10, 0), pady=(18, 0), sticky="nsew")
 
         self.status_label = ctk.CTkLabel(self, anchor="w")
         self.status_label.grid(row=3, column=1, columnspan=1, padx=(20, 0),
@@ -265,17 +266,22 @@ class App(ctk.CTk):
         self.send_button.grid(row=3, column=2, padx=(20, 0), pady=(20, 20),
                               sticky="nsew")
 
-        # Connection Parameters frame
-        self.conn_param_frame = ctk.CTkFrame(self)
-        self.conn_param_frame.grid(row=0, column=3, padx=(20, 20),
-                                   pady=(20, 0), sticky="nsew")
+        # right sidebar with settings #########################################
+        self.tabview = ctk.CTkTabview(self, width=230, height=300)
+        self.tabview.grid(row=0, column=3, rowspan=8, padx=(10, 0), pady=(0, 0), sticky="nsew")
+        self.tabview.add("Connection")
+        self.tabview.add("Web Server")
+
+        # Connection Parameters tab
+        self.conn_param_frame = ctk.CTkFrame(self.tabview.tab("Connection"))
+        self.conn_param_frame.pack(fill="both", expand=True)
+
         self.conn_param_label = ctk.CTkLabel(master=self.conn_param_frame,
                                              text="Connection Parameters",
                                              font=("Arial", 16))
         self.conn_param_label.grid(row=0, column=0, columnspan=2,
                                    padx=10, pady=10, sticky="")
 
-        # Entry fields and their initial values
         self.entries = {
             'Device Address': ('addr', 1),
             'Username': ('user', 2),
@@ -289,42 +295,62 @@ class App(ctk.CTk):
                                  placeholder_text=placeholder, show=show_char)
             if self.cfg[cfg_key]:
                 entry.insert(0, self.cfg[cfg_key])
-            entry.grid(row=row, column=0, pady=10, padx=20, sticky="ew")
+            entry.grid(row=row, column=0, pady=10, padx=10, sticky="ew")
 
-        self.ssh_agent = ctk.CTkSwitch(self.conn_param_frame, text="SSH Agent")
-        self.ssh_agent.grid(row=5, column=0, pady=10, padx=20, sticky="n")
+        self.ssh_agent = ctk.CTkSwitch(self.conn_param_frame, text="Use SSH Agent")
+        self.ssh_agent.grid(row=5, column=0, pady=10, padx=10, sticky="n")
         if self.cfg['ssh-agent']:
             self.ssh_agent.select()
 
         self.save_button = ctk.CTkButton(self.conn_param_frame,
                                          command=self.save_params, text="Save")
-        self.save_button.grid(row=6, column=0, pady=10, padx=20, sticky="ew")
+        self.save_button.grid(row=6, column=0, pady=10, padx=10, sticky="ew")
 
-        # Web Server Settings frame
-        self.web_server_frame = ctk.CTkFrame(self)
-        self.web_server_frame.grid(row=1, column=3, padx=(20, 20), pady=(20, 0), sticky="nsew")
+        # Web Server Settings tab
+        self.web_server_frame = ctk.CTkFrame(self.tabview.tab("Web Server"))
+        self.web_server_frame.pack(fill="both", expand=True)
 
-        self.web_server_label = ctk.CTkLabel(self.web_server_frame, text="Web Server Settings")
-        self.web_server_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.web_server_label = ctk.CTkLabel(self.web_server_frame,
+                                             text="Web Server Settings",
+                                             font=("Arial", 16))
+        self.web_server_label.grid(row=0, column=0, columnspan=2,
+                                   padx=10, pady=10, sticky="")
 
         self.interface_entry = ctk.CTkEntry(self.web_server_frame)
-        self.interface_entry.insert(0, self.cfg['interface'])
-        self.interface_entry.grid(row=1, column=0, pady=10, padx=20, sticky="ew")
-
-        self.directory_button = ctk.CTkButton(self.web_server_frame, text="Select Directory", command=self.select_directory)
-        self.directory_button.grid(row=2, column=0, pady=10, padx=20, sticky="ew")
+        self.interface_entry.insert(0, self.cfg['server_iface'])
+        self.interface_entry.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
 
         self.server_port_entry = ctk.CTkEntry(self.web_server_frame, placeholder_text="Server Port")
         self.server_port_entry.insert(0, str(self.cfg['server_port']))
-        self.server_port_entry.grid(row=3, column=0, pady=10, padx=20, sticky="ew")
+        self.server_port_entry.grid(row=2, column=0, pady=10, padx=10, sticky="ew")
 
-        if self.cfg['server_directory']:
-            self.server_directory = self.cfg['server_directory']
-        else:
-            self.server_directory = tempfile.TemporaryDirectory().name
+        # Server directory row
+        self.directory_frame = ctk.CTkFrame(self.web_server_frame)
+        self.directory_frame.grid(row=3, column=0, pady=10, padx=10, sticky="ew")
 
-        self.interface_save_button = ctk.CTkButton(self.web_server_frame, text="Save Settings", command=self.save_server_settings)
-        self.interface_save_button.grid(row=4, column=0, pady=10, padx=20, sticky="ew")
+        self.directory_entry = ctk.CTkEntry(self.directory_frame)
+        self.directory_entry.insert(0, self.cfg['server_path'])
+        self.directory_entry.grid(row=0, column=0, sticky="ew")
+
+        self.folder_icon = CTkImage(light_image=Image.open("icons/open.png")
+                                    .resize((20, 20), Image.LANCZOS))
+        self.directory_button = ctk.CTkButton(self.directory_frame,
+                                              image=self.folder_icon,
+                                              text="", width=40,
+                                              command=self.select_directory)
+        self.directory_button.grid(row=0, column=1, padx=(3, 0))
+
+        self.directory_frame.grid_columnconfigure(0, weight=4)
+        self.directory_frame.grid_columnconfigure(1, weight=1)
+
+        if self.cfg['server_path']:
+            self.server_path = self.cfg['server_path']
+
+        # Save button
+        self.interface_save_button = ctk.CTkButton(self.web_server_frame,
+                                                   text="Save",
+                                                   command=self.save_server_settings)
+        self.interface_save_button.grid(row=4, column=0, pady=20, padx=10, sticky="")
 
         # Check if theme is set to "System", otherwise use saved theme
         self.change_theme_mode_event(self.cfg['theme'])
@@ -339,17 +365,19 @@ class App(ctk.CTk):
         self.start_file_server()
 
     def select_directory(self):
-        directory = filedialog.askdirectory(initialdir=self.server_directory)
+        directory = filedialog.askdirectory(initialdir=self.server_path)
         if directory:
-            self.server_directory = directory
-            self.cfg['server_directory'] = self.server_directory
+            self.server_path = directory
+            self.cfg['server_path'] = self.server_path
+            self.server_path_entry.delete(0, 'end')
+            self.server_path_entry.insert(0, str(self.cfg['server_path']))
             self.cfg_mgr.save()
             self.restart_file_server()
-            self.status(f"Serving files from: {self.server_directory}")
+            self.status(f"Serving files from: {self.server_path}")
 
     def save_server_settings(self):
-        self.cfg['interface'] = self.interface_entry.get()
-        self.cfg['server_directory'] = self.server_directory
+        self.cfg['server_iface'] = self.interface_entry.get()
+        self.cfg['server_path'] = self.server_path
         try:
             self.cfg['server_port'] = int(self.server_port_entry.get())
         except ValueError:
@@ -360,9 +388,9 @@ class App(ctk.CTk):
         self.status("Web server settings updated and server restarted.")
 
     def start_file_server(self):
-        interface = self.cfg['interface']
+        interface = self.cfg['server_iface']
         port = self.cfg['server_port']
-        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=self.server_directory)
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=self.server_path)
         self.server = socketserver.TCPServer(("", port), handler)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
@@ -560,7 +588,7 @@ class App(ctk.CTk):
 
     def open_file(self):
         files = [('XML File', '*.xml')]
-        file = filedialog.askopenfile(initialdir=self.server_directory,
+        file = filedialog.askopenfile(initialdir=self.server_path,
                                       filetypes=files, defaultextension=files)
         if file is not None:
             content = file.read()
@@ -611,10 +639,10 @@ class App(ctk.CTk):
         return False
 
     def save_interface(self):
-        self.cfg['interface'] = self.interface_entry.get()
+        self.cfg['server_iface'] = self.interface_entry.get()
         self.cfg_mgr.save()
         self.restart_file_server()
-        self.status("Interface updated and web server restarted.")
+        self.status("Settings saved and web server restarted.")
 
     # PROFINET STATUS METHODS
     def _full_path(self, relative_path):
@@ -736,7 +764,7 @@ class App(ctk.CTk):
             if platform.system() == "Windows":
                 host_ip = socket.gethostbyname(socket.gethostname())
             else:
-                host_ip = netifaces.ifaddresses(self.cfg['interface'])[netifaces.AF_INET][0]['addr']
+                host_ip = netifaces.ifaddresses(self.cfg['server_iface'])[netifaces.AF_INET][0]['addr']
 
             url = f"http://{host_ip}:{self.cfg['server_port']}/{os.path.basename(self.upgrade_file)}"
             logging.debug(f"Upgrade URL: {url}")
@@ -747,7 +775,7 @@ class App(ctk.CTk):
     # Example usage in App class
     def upgrade_cb(self):
         self.upgrade_file = filedialog.askopenfilename(
-            initialdir=self.server_directory,
+            initialdir=self.server_path,
             title="Select Upgrade Image",
             filetypes=[("Upgrade Package", "*.pkg")])
         if not self.upgrade_file:
