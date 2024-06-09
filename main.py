@@ -70,8 +70,9 @@ class ConfigManager:
             'theme': "System",
             'zoom': "100%",
             'server_iface': 'virbr0',
+            'server_enabled': True,
             'server_path': '',
-            'server_port': 8008
+            'server_port': 8080
         }
         self.cfg = self.default_cfg.copy()
         self.load()
@@ -346,11 +347,16 @@ class App(ctk.CTk):
         if self.cfg['server_path']:
             self.server_path = self.cfg['server_path']
 
+        self.server_enabled = ctk.CTkSwitch(self.web_server_frame, text="Enabled")
+        self.server_enabled.grid(row=4, column=0, pady=10, padx=10, sticky="n")
+        if self.cfg['server_enabled']:
+            self.server_enabled.select()
+
         # Save button
         self.interface_save_button = ctk.CTkButton(self.web_server_frame,
                                                    text="Save",
                                                    command=self.save_server_settings)
-        self.interface_save_button.grid(row=4, column=0, pady=20, padx=10, sticky="")
+        self.interface_save_button.grid(row=5, column=0, pady=20, padx=10, sticky="")
 
         # Check if theme is set to "System", otherwise use saved theme
         self.change_theme_mode_event(self.cfg['theme'])
@@ -378,16 +384,22 @@ class App(ctk.CTk):
     def save_server_settings(self):
         self.cfg['server_iface'] = self.interface_entry.get()
         self.cfg['server_path'] = self.server_path
+        self.cfg['server_enabled'] = self.server_enabled.get()
         try:
             self.cfg['server_port'] = int(self.server_port_entry.get())
         except ValueError:
             self.error("Invalid server port. Please enter a valid number.")
             return
         self.cfg_mgr.save()
-        self.restart_file_server()
-        self.status("Web server settings updated and server restarted.")
+        if self.restart_file_server():
+            self.status("Web server settings updated and server restarted.")
+        else:
+            self.status("Web server settings saved, server not running.")
 
     def start_file_server(self):
+        if not self.cfg['server_enabled']:
+            return False
+
         interface = self.cfg['server_iface']
         port = self.cfg['server_port']
         handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=self.server_path)
@@ -396,12 +408,13 @@ class App(ctk.CTk):
         self.server_thread.daemon = True
         self.server_thread.start()
         self.status(f"Serving files on {interface}:{port}")
+        return True
 
     def restart_file_server(self):
         if self.server:
             self.server.shutdown()
             self.server.server_close()
-        self.start_file_server()
+        return self.start_file_server()
 
     # UI METHODS
     def load_icons(self):
