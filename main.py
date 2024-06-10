@@ -803,10 +803,12 @@ class App(ctk.CTk):
             xml_path = self._full_path("enable-profinet.xml")
         else:
             xml_path = self._full_path("disable-profinet.xml")
-
-        with open(xml_path, 'r') as file:
-            xml_payload = file.read()
-        self.show(xml_payload)
+        try:
+            with open(xml_path, 'r') as file:
+                xml_payload = file.read()
+            self.show(xml_payload)
+        except FileNotFoundError:
+            self.error(f"file {xml_path} not found!")
 
     # GET CONFIGURATION/DATASTORE METHOD
     def get_config_cb(self, config):
