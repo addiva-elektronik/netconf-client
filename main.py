@@ -21,9 +21,11 @@ import threading
 import tkinter as tk
 import time
 from xml.dom.minidom import parseString
+import markdown
 import psutil
 from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
 from tkinter import Menu, END, filedialog, messagebox, Listbox, Toplevel
+from tkinterweb import HtmlFrame
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
 from customtkinter import CTkImage
@@ -206,6 +208,7 @@ class App(ctk.CTk):
 
         self.settings_menu = Menu(self.menubar, tearoff=0)
         self.file_menu = Menu(self.menubar, tearoff=0)
+        self.help_menu = Menu(self.menubar, tearoff=0)
 
         self.settings_menu.add_radiobutton(label="System", variable=self.theme_var,
                                            command=lambda: self.change_theme_mode_event("System"))
@@ -241,8 +244,12 @@ class App(ctk.CTk):
                                    image=self.exit_icon, compound="left")
         self.bind_all("<Control-q>", lambda event: self.quit())
 
+        self.help_menu.add_command(label="Usage", command=self.show_usage)
+        self.help_menu.add_command(label="About", command=self.show_about)
+
         self.menubar.add_cascade(label="File", underline=0, menu=self.file_menu)
         self.menubar.add_cascade(label="Settings", underline=0, menu=self.settings_menu)
+        self.menubar.add_cascade(label="Help", underline=0, menu=self.help_menu)
 
         self.update_menu_icons()
 
@@ -744,6 +751,56 @@ class App(ctk.CTk):
         if path:
             with open(path, "w") as file:
                 file.write(self.textbox.get('1.0', END))
+
+    def show_usage(self):
+        fn = self._full_path("usage.md")
+        try:
+            with open(fn, "r") as file:
+                content = file.read()
+                html = markdown.markdown(content,
+                                         extensions=['fenced_code',
+                                                     'codehilite'])
+                self.show_html_dialog("Usage", html)
+        except FileNotFoundError:
+            self.error(f"file {fn} not found.")
+
+    def show_html_dialog(self, title, html_content):
+        dialog = Toplevel(self)
+        dialog.title(title)
+
+        # Set the desired size of the dialog
+        dialog_width = 800
+        dialog_height = 600
+
+        # Calculate the position to center the dialog over the main application window
+        main_x = self.winfo_rootx()
+        main_y = self.winfo_rooty()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+
+        position_right = int(main_x + (main_width - dialog_width) / 2)
+        position_down = int(main_y + (main_height - dialog_height) / 2)
+
+        # Set the geometry of the dialog to center it on the main application window
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{position_right}+{position_down}")
+
+        html_frame = HtmlFrame(dialog, horizontal_scrollbar="auto", messages_enabled = False)
+        html_frame.load_html(html_content)
+        html_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        close_button = ctk.CTkButton(dialog, text="Close", command=dialog.destroy)
+        close_button.pack(pady=10)
+
+        dialog.bind("<Control-w>", lambda event: dialog.destroy())
+
+    def show_about(self):
+        about_message = (
+            "Simple NETCONF Client\n"
+            "Author: Ejub Šabić\n"
+            "License: MIT\n"
+            "Version: 1.0.0"
+        )
+        messagebox.showinfo("About", about_message)
 
     # CONNECTION PARAMETERS METHODS
     def save_params(self):
