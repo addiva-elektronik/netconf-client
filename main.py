@@ -329,9 +329,9 @@ class App(ctk.CTk):
         self.directory_frame = ctk.CTkFrame(self.web_server_frame)
         self.directory_frame.grid(row=3, column=0, pady=10, padx=10, sticky="ew")
 
-        self.directory_entry = ctk.CTkEntry(self.directory_frame)
-        self.directory_entry.insert(0, self.cfg['server_path'])
-        self.directory_entry.grid(row=0, column=0, sticky="ew")
+        self.server_path_entry = ctk.CTkEntry(self.directory_frame)
+        self.server_path_entry.insert(0, self.cfg['server_path'])
+        self.server_path_entry.grid(row=0, column=0, sticky="ew")
 
         self.folder_icon = CTkImage(light_image=Image.open("icons/open.png")
                                     .resize((20, 20), Image.LANCZOS))
