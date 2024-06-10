@@ -301,7 +301,7 @@ class App(ctk.CTk):
         self.profinet_button.grid(row=9, column=0, padx=20, pady=0)
 
         # main XML textbox ####################################################
-        self.textbox = ctk.CTkTextbox(self, width=250)
+        self.textbox = ctk.CTkTextbox(self, width=250, font=("Courier", 13))
         self.textbox.grid(row=0, column=1, columnspan=2, rowspan=3,
                           padx=(10, 0), pady=(18, 0), sticky="nsew")
 
