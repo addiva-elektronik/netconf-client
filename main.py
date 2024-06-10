@@ -5,6 +5,7 @@ Copyright (c) 2024 Ejub Šabić <ejub1946@outlook.com>
 """
 import os
 import json
+import re
 import sys
 import argparse
 import subprocess
@@ -16,10 +17,11 @@ import socketserver
 import socket
 import logging
 import threading
+import tkinter as tk
 import time
-from enum import Enum
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, filedialog, messagebox
+import psutil
+from tkinter import Menu, END, filedialog
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
 from customtkinter import CTkImage
@@ -317,9 +319,11 @@ class App(ctk.CTk):
         self.web_server_label.grid(row=0, column=0, columnspan=2,
                                    padx=10, pady=10, sticky="")
 
-        self.interface_entry = ctk.CTkEntry(self.web_server_frame)
-        self.interface_entry.insert(0, self.cfg['server_iface'])
-        self.interface_entry.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
+        self.interface_var = tk.StringVar()
+        self.interface_menu = ctk.CTkOptionMenu(self.web_server_frame,
+                                                variable=self.interface_var)
+        self.interface_menu.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
+        self.update_interface_menu()
 
         self.server_port_entry = ctk.CTkEntry(self.web_server_frame, placeholder_text="Server Port")
         self.server_port_entry.insert(0, str(self.cfg['server_port']))
@@ -381,8 +385,47 @@ class App(ctk.CTk):
             self.restart_file_server()
             self.status(f"Serving files from: {self.server_path}")
 
+    def get_interfaces(slf):
+        interfaces = psutil.net_if_addrs()
+        interface_list = []
+        for interface in interfaces:
+            for addr in interfaces[interface]:
+                if addr.family == socket.AF_INET and not addr.address.startswith('127.'):
+                    interface_list.append((interface, addr.address))
+                    break
+        return interface_list
+
+    def select_default_interface(self):
+        """Get default interface, either a saved one, or first Ethernet"""
+        patterns = ["eth", "en", "local area connection"]
+        interfaces = self.get_interfaces()
+
+        for interface, ip in interfaces:
+            if interface == self.cfg['server_iface']:
+                return interface, ip
+
+        for interface, ip in interfaces:
+            nm = interface.lower()
+            if any(pattern in nm for pattern in patterns):
+                return interface, ip
+
+        return interfaces[0] if interfaces else (None, None)
+
+    def update_interface_menu(self):
+        interfaces = self.get_interfaces()
+        if interfaces:
+            self.interface_menu.configure(values=[f"{name} ({ip})" for name, ip in interfaces])
+            default_interface, default_ip = self.select_default_interface()
+            if default_interface:
+                self.interface_var.set(f"{default_interface} ({default_ip})")
+
+    def get_iface_ip(self):
+        match = re.match(r"(\w+)\s+\(([\d\.]+)\)", self.interface_var.get())
+        return match.groups() if match else (None, None)
+
     def save_server_settings(self):
-        self.cfg['server_iface'] = self.interface_entry.get()
+        (iface, _) = self.get_iface_ip()
+        self.cfg['server_iface'] = iface
         self.cfg['server_path'] = self.server_path
         self.cfg['server_enabled'] = self.server_enabled.get()
         try:
@@ -774,12 +817,11 @@ class App(ctk.CTk):
             if m is None:
                 return
 
-            if platform.system() == "Windows":
-                host_ip = socket.gethostbyname(socket.gethostname())
-            else:
-                host_ip = netifaces.ifaddresses(self.cfg['server_iface'])[netifaces.AF_INET][0]['addr']
+            (_, host_ip) = self.get_iface_ip()
+            host_port = self.cfg['server_port']
+            pkg = os.path.basename(self.upgrade_file)
 
-            url = f"http://{host_ip}:{self.cfg['server_port']}/{os.path.basename(self.upgrade_file)}"
+            url = f"http://{host_ip}:{host_port}/{pkg}"
             logging.debug(f"Upgrade URL: {url}")
 
             # Start the upgrade RPC call
