@@ -108,19 +108,22 @@ class NetconfConnection:
 
     def __enter__(self):
         try:
-            self.manager = manager.connect(host=self.cfg['addr'],
-                                           port=self.cfg['port'],
+            host = self.cfg['addr']
+            port = self.cfg['port']
+            self.app.status(f"Connecting to {host} port {port}, please wait ...")
+            self.manager = manager.connect(host=host,
+                                           port=port,
                                            username=self.cfg['user'],
                                            password=self.cfg['pass'],
                                            hostkey_verify=False,
                                            allow_agent=self.cfg['ssh-agent'],
                                            timeout=30)
-            self.app.status("Connected to NETCONF server")
+            self.app.status(f"Connected to NETCONF server {host}.")
             return self.manager
         except AuthenticationError as err:
-            self.app.error(f"Authentication failed: {err}")
+            self.app.error(f"Authentication with {host} failed: {err}")
         except SSHError as err:
-            self.app.error(f"SSH connection failed: {err}")
+            self.app.error(f"SSH connection to {host} port {port} failed: {err}")
         except Exception as err:
             self.app.error(f"An unexpected error occurred: {err}")
             raise err
@@ -749,9 +752,11 @@ class App(ctk.CTk):
     def execute_get_oper(self):
         """Fetch operational data"""
         with NetconfConnection(self.cfg, self) as m:
-            nc_filter = to_ele(self.textbox.get("1.0", END))
             if m is None:
                 return
+
+            nc_filter = to_ele(self.textbox.get("1.0", END))
+            self.show("")
             try:
                 result = m.get(nc_filter)
                 dom = parseString(result.xml)
@@ -766,11 +771,14 @@ class App(ctk.CTk):
         self.rpc("Reboot device", self.execute_reboot)
 
     def execute_reboot(self):
-        rpc = to_ele(self.textbox.get("1.0", END))
         with NetconfConnection(self.cfg, self) as m:
             if m is None:
                 return
+
+            rpc = to_ele(self.textbox.get("1.0", END))
+            self.show("")
             try:
+                self.status("Please wait while device reboots ...")
                 response = m.dispatch(rpc, source=None, filter=None)
                 self.show(response)
             except Exception as err:
@@ -803,8 +811,10 @@ class App(ctk.CTk):
         with NetconfConnection(self.cfg, self) as m:
             if m is None:
                 return
+
+            rpc = to_ele(self.textbox.get("1.0", END))
+            self.show("")
             try:
-                rpc = to_ele(self.textbox.get("1.0", END))
                 response = m.dispatch(rpc, source=None, filter=None)
                 self.show(response)
             except Exception as err:
@@ -836,13 +846,14 @@ class App(ctk.CTk):
         self.rpc("Upgrade device", self.start_upgrade)
 
     def start_upgrade(self):
-        rpc = to_ele(self.textbox.get("1.0", END))
         with NetconfConnection(self.cfg, self) as m:
             if m is None:
                 return
 
+            rpc = to_ele(self.textbox.get("1.0", END))
+            self.show("")
             try:
-                response = m.dispatch(to_ele(rpc))
+                response = m.dispatch(rpc)
                 if '<ok/>' in response.xml:
                     self.status("Upgrade started successfully.")
                 else:
