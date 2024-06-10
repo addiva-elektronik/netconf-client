@@ -16,20 +16,16 @@ import http.server
 import socketserver
 import socket
 import logging
-import socket
 import threading
 import tkinter as tk
-import time
 from xml.dom.minidom import parseString
+from tkinter import Menu, END, filedialog, messagebox, Listbox, Toplevel
 import markdown
 import psutil
-from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
-from tkinter import Menu, END, filedialog, messagebox, Listbox, Toplevel
+from zeroconf import ServiceBrowser, Zeroconf
 from tkinterweb import HtmlFrame
-from PIL import Image, ImageTk, ImageOps
+from PIL import Image, ImageTk
 import customtkinter as ctk
-from customtkinter import CTkImage
-import netifaces
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
 from ncclient.xml_ import to_ele
