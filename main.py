@@ -738,9 +738,11 @@ class App(ctk.CTk):
         if error:
             self.status_label.configure(text=f"Error: {message}",
                                         text_color=("#FF0000", "#FF4C4C"))
+            logging.error(message)
         else:
             self.status_label.configure(text=message,
                                         text_color=("#000000", "#FFFFFF"))
+            logging.info(message)
         # Update GUI even if we run in an callback
         self.update_idletasks()
 
