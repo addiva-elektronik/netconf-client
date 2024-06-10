@@ -18,6 +18,7 @@ import socket
 import logging
 import threading
 import tkinter as tk
+import xml.etree.ElementTree as ET
 from xml.dom.minidom import parseString
 from tkinter import Menu, END, filedialog, messagebox, Listbox, Toplevel
 import markdown
@@ -929,7 +930,33 @@ class App(ctk.CTk):
         except FileNotFoundError:
             self.error(f"file {xml_path} not found!")
 
-    # GET CONFIGURATION/DATASTORE METHOD
+    # Get configuration/datastore method(s)
+    def extract_xml_data(self, xml_string):
+        try:
+            dom = parseString(xml_string)
+            data_element = dom.getElementsByTagName("data")[0]
+            # Create a new DOM document to pretty print the inner content
+            pretty_dom = parseString(data_element.toxml())
+            pretty_xml = pretty_dom.toprettyxml(indent="    ")  # 4 spaces
+
+            # Remove the XML declaration and <data> tags
+            lines = pretty_xml.split("\n")[2:-2]
+
+            # Remove leading indentation
+            min_indent = float('inf')
+            for line in lines:
+                stripped_line = line.lstrip()
+                if stripped_line:
+                    indent = len(line) - len(stripped_line)
+                    min_indent = min(min_indent, indent)
+            lines = [line[min_indent:] if line.strip() else line for line in lines]
+
+            inner_xml = "\n".join(lines)
+            return inner_xml
+        except Exception as e:
+            self.error(f"Error extracting data from XML: {e}")
+            return None
+
     def get_config_cb(self, config):
         if self.is_empty_connection_parameters():
             self.error("Connection parameters cannot be empty!")
@@ -941,9 +968,9 @@ class App(ctk.CTk):
             if m is None:
                 return
             try:
-                result = m.get_config(source=config)
-                dom = parseString(result.xml)
-                self.show(str(dom.toprettyxml()))
+                response = m.get_config(source=config)
+                data = self.extract_xml_data(response.xml)
+                self.show(data)
             except Exception as err:
                 self.error(f"Failed fetching configuration: {err}")
                 print(err)
@@ -964,8 +991,8 @@ class App(ctk.CTk):
             self.show("")
             try:
                 response = m.dispatch(rpc, source=None, filter=None)
-                dom = parseString(response.xml)
-                self.show(str(dom.toprettyxml()))
+                data = self.extract_xml_data(response.xml)
+                self.show(data)
             except Exception as err:
                 self.error(f"Failed fetching operational: {err}")
                 print(err)
