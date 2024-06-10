@@ -18,9 +18,9 @@ import socket
 import logging
 import threading
 import tkinter as tk
-import xml.etree.ElementTree as ET
+from tkinter import Menu, END, filedialog, messagebox, Listbox, \
+    Toplevel, TclError
 from xml.dom.minidom import parseString
-from tkinter import Menu, END, filedialog, messagebox, Listbox, Toplevel
 import markdown
 import psutil
 from zeroconf import ServiceBrowser, Zeroconf
@@ -337,9 +337,16 @@ class App(ctk.CTk):
         self.profinet_button.grid(row=11, column=0, padx=10, pady=0)
 
         # main XML textbox ####################################################
-        self.textbox = ctk.CTkTextbox(self, width=250, font=("Courier", 13))
+        self.textbox = ctk.CTkTextbox(self, width=250, font=("Courier", 13), undo=True)
         self.textbox.grid(row=0, column=1, columnspan=2, rowspan=3,
                           padx=(10, 0), pady=(18, 0), sticky="nsew")
+
+        self.textbox.bind("<Control-z>", lambda event: self.undo())
+        self.textbox.bind("<Control-Z>", lambda event: self.undo()) # Linux
+        self.textbox.bind("<Control-y>", lambda event: self.redo())
+        self.textbox.bind("<Control-Y>", lambda event: self.redo()) # Linux
+        self.textbox.bind("<Control-a>", lambda event: self.select_all())
+        self.textbox.bind("<Control-A>", lambda event: self.select_all()) # Linux
 
         self.status_label = ctk.CTkLabel(self, anchor="w")
         self.status_label.grid(row=3, column=1, columnspan=1, padx=(20, 0),
@@ -632,6 +639,22 @@ class App(ctk.CTk):
         return self.start_file_server()
 
     # UI METHODS
+    def undo(self):
+        try:
+            self.textbox.edit_undo()
+        except TclError:
+            pass  # Ignore the error if there's nothing to undo
+
+    def redo(self):
+        try:
+            self.textbox.edit_redo()
+        except TclError:
+            pass  # Ignore the error if there's nothing to redo
+
+    def select_all(self):
+        self.textbox.tag_add("sel", "1.0", "end")
+        return 'break'  # Prevent default behavior
+
     def load_icons(self):
         self.icon_images = {
             'save': Image.open("icons/save.png"),
