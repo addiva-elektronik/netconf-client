@@ -41,22 +41,14 @@ RPC_SET_DATETIME = f"""<set-current-datetime xmlns="urn:ietf:params:xml:ns:yang:
     <current-datetime>{datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()}</current-datetime>
 </set-current-datetime>
 """
-RPC_GET_OPER = """<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-    <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
-        <interface>
-            <name/>
-            <statistics/>
-        </interface>
-    </interfaces>
-    <system xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
-        <clock/>
-        <hostname/>
-        <contact/>
-        <location/>
-        <platform/>
-        <uptime/>
-    </system>
-</filter>
+RPC_GET_OPER = """<get-data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-nmda"
+          xmlns:ds="urn:ietf:params:xml:ns:yang:ietf-datastores">
+    <datastore>ds:operational</datastore>
+    <subtree-filter>
+        <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces"/>
+        <system-state xmlns="urn:ietf:params:xml:ns:yang:ietf-system"/>
+    </subtree-filter>
+</get-data>
 """
 
 class ConfigManager:
@@ -755,11 +747,11 @@ class App(ctk.CTk):
             if m is None:
                 return
 
-            nc_filter = to_ele(self.textbox.get("1.0", END))
+            rpc = to_ele(self.textbox.get("1.0", END))
             self.show("")
             try:
-                result = m.get(nc_filter)
-                dom = parseString(result.xml)
+                response = m.dispatch(rpc, source=None, filter=None)
+                dom = parseString(response.xml)
                 self.show(str(dom.toprettyxml()))
             except Exception as err:
                 self.error(f"Failed fetching operational: {err}")
