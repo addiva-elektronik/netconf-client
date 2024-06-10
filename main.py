@@ -221,31 +221,31 @@ class App(ctk.CTk):
 
         self.settings_menu.add_command(label="Zoom In", accelerator="Ctrl++",
                                        command=self.zoom_in_event)
-        self.bind_all("<Control-plus>", lambda event: self.zoom_in_event())
-
         self.settings_menu.add_command(label="Zoom Out", accelerator="Ctrl+-",
                                        command=self.zoom_out_event)
-        self.bind_all("<Control-minus>", lambda event: self.zoom_out_event())
 
         self.file_menu.add_command(label="Open", underline=0,
                                    accelerator="Ctrl+O",
                                    command=self.open_file,
                                    image=self.load_icon, compound="left")
-        self.bind_all("<Control-o>", lambda event: self.open_file)
         self.file_menu.add_command(label="Save", underline=0,
                                    accelerator="Ctrl+S",
                                    command=self.save_file,
                                    image=self.save_icon, compound="left")
-        self.bind_all("<Control-s>", lambda event: self.save_file)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", underline=0,
                                    accelerator="Ctrl+Q",
                                    command=self.quit,
                                    image=self.exit_icon, compound="left")
-        self.bind_all("<Control-q>", lambda event: self.quit())
 
-        self.help_menu.add_command(label="Usage", command=self.show_usage)
-        self.help_menu.add_command(label="About", command=self.show_about)
+        self.help_menu.add_command(label="Usage", underline=0,
+                                   accelerator="Ctrl+H",
+                                   command=self.show_usage,
+                                   image=self.transparent_icon,
+                                   compound="left")
+        self.help_menu.add_command(label="About", command=self.show_about,
+                                   image=self.transparent_icon,
+                                   compound="left")
 
         self.menubar.add_cascade(label="File", underline=0, menu=self.file_menu)
         self.menubar.add_cascade(label="Settings", underline=0, menu=self.settings_menu)
@@ -439,9 +439,23 @@ class App(ctk.CTk):
         # set default values
         self.rpc_cb = None
         self.textbox.delete(0.0, 'end')
-        self.textbox.insert("0.0", "XML Command Goes here!")
+        self.textbox.insert("0.0", "Welcome to the NETCONF client!\n\n"
+                            "Please use the buttons on the left to initiate "
+                            "commands.  They will show RPC commands in this "
+                            "window and pressing Send will then connect to "
+                            "the device and show the commend result here.\n\n"
+                            "Connecting details for the device on the right.")
 
-        # Start the web server
+        self.bind("<Control-plus>", lambda event: self.zoom_in_event())
+        self.bind("<Control-minus>", lambda event: self.zoom_out_event())
+        self.bind("<Control-o>", lambda event: self.open_file())
+        self.bind("<Control-s>", lambda event: self.save_file())
+        self.bind("<Control-q>", lambda event: self.quit())
+        self.bind("<Control-h>", lambda event: self.show_usage())
+
+        self.focus_set()
+
+        # Start the web server if enabled in a previous run.
         self.start_file_server()
 
     def scan_devices(self):
@@ -558,16 +572,19 @@ class App(ctk.CTk):
         self.icon_images = {
             'save': Image.open("icons/save.png"),
             'load': Image.open("icons/open.png"),
-            'exit': Image.open("icons/close.png")
+            'exit': Image.open("icons/close.png"),
+            'tran': Image.open("icons/transparent.png")
         }
         self.icons = {
             'save': ImageTk.PhotoImage(self.icon_images['save']),
             'load': ImageTk.PhotoImage(self.icon_images['load']),
-            'exit': ImageTk.PhotoImage(self.icon_images['exit'])
+            'exit': ImageTk.PhotoImage(self.icon_images['exit']),
+            'tran': ImageTk.PhotoImage(self.icon_images['tran'])
         }
         self.load_icon = self.icons['load']
         self.save_icon = self.icons['save']
         self.exit_icon = self.icons['exit']
+        self.transparent_icon = self.icons['tran']
 
     def update_menu_icons(self):
         if ctk.get_appearance_mode() == "Dark":

@@ -1,6 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['main.py'],
     pathex=[],
@@ -10,6 +9,7 @@ a = Analysis(
            ('open.png', 'icons'),
            ('save.png', 'icons'),
            ('close.png', 'icons'),
+           ('transparent.png', 'icons'),
            ('usage.md', '.')],
     hiddenimports=[],
     hookspath=[],
