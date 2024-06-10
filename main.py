@@ -16,12 +16,14 @@ import http.server
 import socketserver
 import socket
 import logging
+import socket
 import threading
 import tkinter as tk
 import time
 from xml.dom.minidom import parseString
 import psutil
-from tkinter import Menu, END, filedialog
+from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
+from tkinter import Menu, END, filedialog, messagebox, Listbox, Toplevel
 from PIL import Image, ImageTk, ImageOps
 import customtkinter as ctk
 from customtkinter import CTkImage
@@ -124,6 +126,57 @@ class NetconfConnection:
         if self.manager is not None:
             self.manager.close_session()
             self.app.status("Disconnected from NETCONF server")
+
+
+class ZeroconfListener:
+    def __init__(self, app):
+        self.app = app
+        self.devices = []
+
+    def add_service(self, zeroconf, type, name):
+        info = zeroconf.get_service_info(type, name)
+        if info:
+            addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
+            hostname = info.server if info.server else name
+            for address in addresses:
+                self.devices.append((hostname, address, info.port))
+            self.app.update_device_list(self.devices)
+
+    def update_service(self, zeroconf, type, name):
+        pass
+
+    def remove_service(self, zeroconf, type, name):
+        pass
+
+
+class ScanResultsDialog(ctk.CTkToplevel):
+    def __init__(self, parent, devices):
+        super().__init__(parent)
+        self.title("Scan Results")
+        self.geometry("400x300")
+        self.devices = devices
+        self.selected_device = None
+
+        self.listbox = Listbox(self)
+        self.listbox.pack(fill="both", expand=True, padx=10, pady=10)
+        for name, ip, port in self.devices:
+            name = name.rstrip('.')
+            self.listbox.insert('end', f"{name} - {ip}:{port}")
+
+        self.cancel_button = ctk.CTkButton(self, text="Cancel", command=self.on_cancel)
+        self.cancel_button.pack(side="left", padx=10, pady=10)
+
+        self.ok_button = ctk.CTkButton(self, text="OK", command=self.on_ok)
+        self.ok_button.pack(side="right", padx=10, pady=10)
+
+    def on_ok(self):
+        selection = self.listbox.curselection()
+        if selection:
+            self.selected_device = self.devices[selection[0]]
+        self.destroy()
+
+    def on_cancel(self):
+        self.destroy()
 
 
 class App(ctk.CTk):
@@ -280,20 +333,32 @@ class App(ctk.CTk):
         self.conn_param_label.grid(row=0, column=0, columnspan=2,
                                    padx=10, pady=10, sticky="")
 
-        self.entries = {
-            'Device Address': ('addr', 1),
-            'Username': ('user', 2),
-            'Password': ('pass', 3),
-            'Port': ('port', 4)
-        }
+        self.entries = {}
 
-        for placeholder, (cfg_key, row) in self.entries.items():
-            show_char = '*' if cfg_key == 'pass' else None
-            entry = ctk.CTkEntry(self.conn_param_frame,
-                                 placeholder_text=placeholder, show=show_char)
-            if self.cfg[cfg_key]:
-                entry.insert(0, self.cfg[cfg_key])
-            entry.grid(row=row, column=0, pady=10, padx=10, sticky="ew")
+        self.address = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Device Address")
+        self.address.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
+        self.entries['addr'] = self.address
+
+        self.port_select = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Port")
+        self.port_select.grid(row=2, column=0, pady=10, padx=10, sticky="ew")
+        self.entries['port'] = self.port_select
+
+        self.username = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Username")
+        self.username.grid(row=3, column=0, pady=10, padx=10, sticky="ew")
+        self.entries['user'] = self.username
+
+        self.password = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Password", show='*')
+        self.password.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
+        self.entries['pass'] = self.password
+
+        if self.cfg['addr']:
+            self.entries['addr'].insert(0, self.cfg['addr'])
+        if self.cfg['port']:
+            self.entries['port'].insert(0, str(self.cfg['port']))
+        if self.cfg['user']:
+            self.entries['user'].insert(0, self.cfg['user'])
+        if self.cfg['pass']:
+            self.entries['pass'].insert(0, self.cfg['pass'])
 
         self.ssh_agent = ctk.CTkSwitch(self.conn_param_frame, text="Use SSH Agent")
         self.ssh_agent.grid(row=5, column=0, pady=10, padx=10, sticky="n")
@@ -303,6 +368,9 @@ class App(ctk.CTk):
         self.save_button = ctk.CTkButton(self.conn_param_frame,
                                          command=self.save_params, text="Save")
         self.save_button.grid(row=6, column=0, pady=10, padx=10, sticky="ew")
+
+        self.scan_button = ctk.CTkButton(self.conn_param_frame, text="Scan", command=self.scan_devices)
+        self.scan_button.grid(row=7, column=0, pady=10, padx=10, sticky="ew")
 
         # Web Server Settings tab
         self.web_server_frame = ctk.CTkFrame(self.tabview.tab("Web Server"))
@@ -368,6 +436,30 @@ class App(ctk.CTk):
 
         # Start the web server
         self.start_file_server()
+
+    def scan_devices(self):
+        # Initialize Zeroconf and start scanning for _netconf-ssh._tcp devices
+        self.zeroconf = Zeroconf()
+        self.listener = ZeroconfListener(self)
+        self.browser = ServiceBrowser(self.zeroconf, "_netconf-ssh._tcp.local.", self.listener)
+        self.status("Scanning for devices...")
+
+    def update_device_list(self, devices):
+        # Create a dialog to show the list of devices
+        dialog = ScanResultsDialog(self, devices)
+        self.wait_window(dialog)
+        if dialog.selected_device:
+            name, ip, port = dialog.selected_device
+            name = name.rstrip('.')
+            self.cfg['addr'] = ip
+            self.cfg['port'] = port
+            self.entries['addr'].delete(0, 'end')
+            self.entries['addr'].insert(0, ip)
+            self.entries['port'].delete(0, 'end')
+            self.entries['port'].insert(0, str(port))
+            self.status(f"using {name} ({ip}:{port})")
+        else:
+            self.status("canceled.")
 
     def select_directory(self):
         directory = filedialog.askdirectory(initialdir=self.server_path)
