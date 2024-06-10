@@ -21,6 +21,7 @@ import tkinter as tk
 from tkinter import Menu, END, filedialog, messagebox, Listbox, \
     Toplevel, TclError
 from xml.dom.minidom import parseString
+from setuptools_scm import get_version
 import markdown
 import psutil
 from zeroconf import ServiceBrowser, Zeroconf
@@ -58,6 +59,88 @@ RPC_GET_OPER = """<get-data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-nmda
     </subtree-filter>
 </get-data>
 """
+
+
+class AboutDialog(ctk.CTkToplevel):
+    def __init__(self, parent, width, height):
+        super().__init__(parent)
+        self.title("About")
+        parent.center_dialog(self, width, height)
+        about_message = (
+            "Simple NETCONF Client\n"
+            f"v{get_version()}\n"
+            "\n"
+            "Copyright (c) 2024 Ejub Šabić et al.\n"
+            "\n"
+            "This program is available for free as\n"
+            "open source under the MIT license.\n"
+        )
+        label = ctk.CTkLabel(self, text=about_message)
+        label.pack(padx=20, pady=20)
+        close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
+        close_button.pack(pady=10)
+        self.bind("<Control-w>", lambda event: self.destroy())
+
+class LicenseDialog(ctk.CTkToplevel):
+    def __init__(self, parent, width, height):
+        super().__init__(parent)
+        self.title("License")
+        parent.center_dialog(self, width, height)
+        license_message = (
+            "MIT License\n\n"
+            "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the 'Software'), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\n"
+            "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\n"
+            "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+        )
+        label = ctk.CTkLabel(self, text=license_message, wraplength=580)
+        label.pack(padx=20, pady=20)
+        close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
+        close_button.pack(pady=10)
+        self.bind("<Control-w>", lambda event: self.destroy())
+
+class UsageDialog(ctk.CTkToplevel):
+    def __init__(self, parent, content, width, height):
+        super().__init__(parent)
+        self.title("Usage")
+        parent.center_dialog(self, width, height)
+
+        # Apply dark mode CSS if needed
+        css = """
+        body { font-family: Arial, sans-serif; }
+        pre { background-color: #2e2e2e; color: #f8f8f2; padding: 10px; }
+        code { background-color: #2e2e2e; color: #f8f8f2; }
+        body { background-color: #1e1e1e; color: #f8f8f2; }
+        a { color: #1e90ff; text-decoration: underline; }
+        blockquote { border-left: 4px solid #1e90ff; padding-left: 10px; margin-left: 0; color: #888; }
+        """ if ctk.get_appearance_mode() == "Dark" else """
+        body { font-family: Arial, sans-serif; }
+        pre { background-color: #f8f8f2; color: #2e2e2e; padding: 10px; }
+        code { background-color: #f8f8f2; color: #2e2e2e; }
+        body { background-color: #ffffff; color: #000000; }
+        a { color: #0000ff; text-decoration: underline; }
+        blockquote { border-left: 4px solid #0000ff; padding-left: 10px; margin-left: 0; color: #555; }
+        """
+
+        extensions = ['fenced_code', 'codehilite', 'extra']
+        html_content = f"""
+        <html>
+        <head>
+            <style>{css}</style>
+        </head>
+        <body>
+            {markdown.markdown(content, extensions=extensions)}
+        </body>
+        </html>
+        """
+
+        html_frame = HtmlFrame(self, horizontal_scrollbar="auto", messages_enabled=False)
+        html_frame.load_html(html_content)
+        html_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
+        close_button.pack(pady=10)
+        self.bind("<Control-w>", lambda event: self.destroy())
+
 
 class ConfigManager:
     def __init__(self, filename='.netconf_config.json'):
@@ -247,6 +330,9 @@ class App(ctk.CTk):
         self.help_menu.add_command(label="Usage", underline=0,
                                    accelerator="Ctrl+H",
                                    command=self.show_usage,
+                                   image=self.transparent_icon,
+                                   compound="left")
+        self.help_menu.add_command(label="License", command=self.show_license,
                                    image=self.transparent_icon,
                                    compound="left")
         self.help_menu.add_command(label="About", command=self.show_about,
@@ -782,6 +868,23 @@ class App(ctk.CTk):
         for menu in self.menubar.winfo_children():
             menu.configure(bg=bg, fg=fg)
 
+    def center_dialog(self, dialog, width, height):
+        """Utility method to center the dialogs"""
+        dialog_width = width
+        dialog_height = height
+
+        # Calculate the position to center the dialog over the main application window
+        main_x = self.winfo_rootx()
+        main_y = self.winfo_rooty()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+
+        position_right = int(main_x + (main_width - dialog_width) / 2)
+        position_down = int(main_y + (main_height - dialog_height) / 2)
+
+        # Set the geometry of the dialog to center it on the main application window
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{position_right}+{position_down}")
+
     def _update_status(self, message, error=False):
         if error:
             self.status_label.configure(text=f"Error: {message}",
@@ -865,17 +968,21 @@ class App(ctk.CTk):
             with open(path, "w") as file:
                 file.write(self.textbox.get('1.0', END))
 
+    def show_about(self):
+        AboutDialog(self, 320, 260)
+
+    def show_license(self):
+        LicenseDialog(self, 720, 450)
+
     def show_usage(self):
         fn = self._full_path("usage.md")
         try:
             with open(fn, "r") as file:
                 content = file.read()
-                html = markdown.markdown(content,
-                                         extensions=['fenced_code',
-                                                     'codehilite'])
-                self.show_html_dialog("Usage", html)
+                UsageDialog(self, content, 800, 700)
         except FileNotFoundError:
             self.error(f"file {fn} not found.")
+
 
     def show_html_dialog(self, title, html_content):
         dialog = Toplevel(self)
@@ -905,15 +1012,6 @@ class App(ctk.CTk):
         close_button.pack(pady=10)
 
         dialog.bind("<Control-w>", lambda event: dialog.destroy())
-
-    def show_about(self):
-        about_message = (
-            "Simple NETCONF Client\n"
-            "Author: Ejub Šabić\n"
-            "License: MIT\n"
-            "Version: 1.0.0"
-        )
-        messagebox.showinfo("About", about_message)
 
     # CONNECTION PARAMETERS METHODS
     def save_params(self):
