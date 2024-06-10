@@ -812,22 +812,6 @@ class App(ctk.CTk):
                 print(err)
 
     # UPGRADE METHODS
-    def start_upgrade(self):
-        with NetconfConnection(self.cfg, self) as m:
-            if m is None:
-                return
-
-            (_, host_ip) = self.get_iface_ip()
-            host_port = self.cfg['server_port']
-            pkg = os.path.basename(self.upgrade_file)
-
-            url = f"http://{host_ip}:{host_port}/{pkg}"
-            logging.debug(f"Upgrade URL: {url}")
-
-            # Start the upgrade RPC call
-            self.execute_upgrade_rpc(m, url)
-
-    # Example usage in App class
     def upgrade_cb(self):
         self.upgrade_file = filedialog.askopenfilename(
             initialdir=self.server_path,
@@ -837,22 +821,37 @@ class App(ctk.CTk):
             self.error("No upgrade image selected!")
             return
 
-        self.start_upgrade()
+        (_, host_ip) = self.get_iface_ip()
+        host_port = self.cfg['server_port']
+        pkg = os.path.basename(self.upgrade_file)
 
-    def execute_upgrade_rpc(self, m, url):
+        url = f"http://{host_ip}:{host_port}/{pkg}"
+        logging.debug(f"Upgrade URL: {url}")
+
         rpc = f"""<install-bundle xmlns="urn:infix:system:ns:yang:1.0">
     <url>{url}</url>
 </install-bundle>
 """
-        try:
-            response = m.dispatch(to_ele(rpc))
-            if '<ok/>' in response.xml:
-                self.show("Upgrade started successfully.")
-            else:
-                raise Exception("Upgrade RPC did not return <ok/>.")
-        except Exception as err:
-            self.error(f"Failed to start upgrade: {err}")
-            print(err)
+        self.show(rpc)
+        self.rpc("Upgrade device", self.start_upgrade)
+
+    def start_upgrade(self):
+        rpc = to_ele(self.textbox.get("1.0", END))
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+
+            try:
+                response = m.dispatch(to_ele(rpc))
+                if '<ok/>' in response.xml:
+                    self.status("Upgrade started successfully.")
+                else:
+                    dom = parseString(response.xml)
+                    self.show(str(dom.toprettyxml()))
+                    raise Exception("Failed starting upgrade!")
+            except Exception as err:
+                self.error(f"Failed starting upgrade: {err}")
+                print(err)
 
     # NETCONF COMMANDS METHODS
     def execute_netconf_command(self):
