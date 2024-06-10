@@ -4,6 +4,9 @@ This application is a NETCONF client with a user-friendly UI, built with
 Python and customtkinter library, for interacting with NETCONF-enabled
 devices.
 
+For help, see the built-in [Usage Instructions](usage.md).
+
+
 ## Cloning
 
 Use git to clone this repository:
@@ -47,16 +50,19 @@ requires two custom files to be added to the root folder:
 These files should contain the NETCONF xml configuration to enable and
 disable PROFINET on the target device.
 
+
 ## Running and Building
 
 Application can be run on Windows, Linux & MacOS.
 
 ### Running app
+
 ``` 
 ~/src/netconf-client(main)$ python main.py
 ```
 
 ### Building .exe for Windows
+
 ``` 
 pyinstaller --onefile --windowed --add-data "disable-profinet.xml:." --add-data "enable-profinet.xml:." main.py
 ```

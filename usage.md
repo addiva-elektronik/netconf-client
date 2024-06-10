@@ -23,7 +23,28 @@ Left Hand Pane
 The buttons on the left holds NETCONF commands.  The top ones are RPCs
 (remote procedure calls) specific to the device.  There are also
 generic NETCONF RPCs, e.g., for fetching the device's current
-configuration, the `running-config` and `startup-config`.
+configuration.  These use the underlying `<get-config>` RPC, see
+[RFC6241][1] for details.
+
+There is also the *Get Status* button, which serves as an example of
+how to write raw NETCONF RPCs, here `<get-data>` which is currently
+not implemented in ncclient.  See [RFC8526][2] for details.
+
+For backup and restore of a device's configuration it is important to
+understand a bit about the different NETCONF *datastores*.  The first
+is `startup`, which is saved on non-volatile storage.  The `running`
+configuration holds settings which are activated (in RAM) but not yet
+saved.  There is also a `candidate` datastore, which this program does
+not support, it can be used to try to apply new changes to `running`
+without affecting the device's operations.  Applying the change can
+also be done with an automatic rollback on failure, something that
+could be very useful for a more professional NETCONF application.
+
+The *Save* button uses the generic `<copy-config>` NETCONF RPC to copy
+the `running` datastore to `startup` to ensure configuration is saved.
+I.e., for a *restore* operation, first copy to running, verify with a
+read-back of running (still access and same settings as were set) then
+followed by Save (copy to startup).
 
 At the bottom left is a custom button for enabling and disabling a
 PROFINET stack.  The program expects boh `enable-profinet.xml` and
@@ -59,6 +80,12 @@ Example, clicking "Get Status" button loads the RPC command.  When the
 Send button is clicked the application tries to connect to the device,
 selected on the right-hand side, and send the command.  On success the
 resulting device status is shown in the text area.
+
+A perhaps hidden feature of the program is that you can type in any
+valid NETCONF RPC in the text area and press Send to connect to and
+dispatch it to the device.  The response from the server is shown in
+the text area and any status messages or errors are shown next to the
+Send button.
 
 > **Note:** when using an mDNS name to connect to a device, e.g.,
 > switch.local, the name resolution process can take a while during
@@ -110,3 +137,6 @@ pops up when starting Upgrade System.
 
 To activate changes, click "Apply & Save".
 
+
+[1]: https://www.rfc-editor.org/rfc/rfc6241.html
+[2]: https://www.rfc-editor.org/rfc/rfc8526.html
