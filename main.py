@@ -66,7 +66,7 @@ class ConfigManager:
             'theme': "System",
             'zoom': "100%",
             'server_iface': 'virbr0',
-            'server_enabled': True,
+            'server_enabled': False,
             'server_path': '',
             'server_port': 8080
         }
