@@ -188,8 +188,8 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title(APP_TITLE)
-        self.geometry(f"{1100}x{580}")
-        self.minsize(800, 600)  # Handle shrinking app window on zoom in/out
+        self.geometry(f"{1100}x{640}")
+        self.minsize(800, 640)  # Handle shrinking app window on zoom in/out
 
         # Create theme and zoom variables for menu interaction
         self.theme_var = ctk.StringVar(value=self.cfg['theme'])
@@ -342,20 +342,50 @@ class App(ctk.CTk):
 
         self.entries = {}
 
-        self.address = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Device Address")
-        self.address.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
+        self.device_frame = ctk.CTkFrame(self.conn_param_frame)
+        self.device_frame.grid(row=2, column=0, columnspan=2,
+                               pady=0, padx=5, sticky="ew")
+
+        self.user_label = ctk.CTkLabel(self.device_frame,
+                                       text="Device Address",
+                                       font=("Arial", 8))
+        self.user_label.grid(row=0, column=0, pady=0, padx=10, sticky="w")
+
+        self.address = ctk.CTkEntry(self.device_frame, width=198)
+        self.address.grid(row=1, column=0, pady=0, padx=10, sticky="ew")
         self.entries['addr'] = self.address
 
-        self.port_select = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Port")
-        self.port_select.grid(row=2, column=0, pady=10, padx=10, sticky="ew")
+        self.user_label = ctk.CTkLabel(self.device_frame,
+                                       text="Port",
+                                       font=("Arial", 8))
+        self.user_label.grid(row=2, column=0, pady=0, padx=10, sticky="w")
+
+        self.port_select = ctk.CTkEntry(self.device_frame, width=198)
+        self.port_select.grid(row=3, column=0, pady=(0, 10), padx=10, sticky="ew")
         self.entries['port'] = self.port_select
 
-        self.username = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Username")
-        self.username.grid(row=3, column=0, pady=10, padx=10, sticky="ew")
+        self.scan_button = ctk.CTkButton(self.device_frame, text="Find Device",
+                                         width=198,
+                                         command=self.scan_devices)
+        self.scan_button.grid(row=4, column=0, columnspan=2,
+                              pady=(0, 10), padx=10, sticky="ew")
+
+        self.creds_frame = ctk.CTkFrame(self.conn_param_frame)
+        self.creds_frame.grid(row=3, column=0,
+                              pady=10, padx=5, sticky="ew")
+
+        self.user_label = ctk.CTkLabel(self.creds_frame, text="Username", font=("Arial", 8))
+        self.user_label.grid(row=0, column=0, pady=0, padx=10, sticky="w")
+
+        self.username = ctk.CTkEntry(self.creds_frame, width=198)
+        self.username.grid(row=1, column=0, pady=0, padx=10, sticky="ew")
         self.entries['user'] = self.username
 
-        self.password = ctk.CTkEntry(self.conn_param_frame, placeholder_text="Password", show='*')
-        self.password.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
+        self.pass_label = ctk.CTkLabel(self.creds_frame, text="Password", font=("Arial", 8))
+        self.pass_label.grid(row=2, column=0, pady=0, padx=10, sticky="w")
+
+        self.password = ctk.CTkEntry(self.creds_frame, width=198, show='*')
+        self.password.grid(row=3, column=0, pady=(0, 10), padx=10, sticky="ew")
         self.entries['pass'] = self.password
 
         if self.cfg['addr']:
@@ -372,12 +402,10 @@ class App(ctk.CTk):
         if self.cfg['ssh-agent']:
             self.ssh_agent.select()
 
-        self.save_button = ctk.CTkButton(self.conn_param_frame,
-                                         command=self.save_params, text="Save")
-        self.save_button.grid(row=6, column=0, pady=10, padx=10, sticky="ew")
-
-        self.scan_button = ctk.CTkButton(self.conn_param_frame, text="Scan", command=self.scan_devices)
-        self.scan_button.grid(row=7, column=0, pady=10, padx=10, sticky="ew")
+        self.save_button = ctk.CTkButton(self.conn_param_frame, width=218,
+                                         text="Apply & Save",
+                                         command=self.save_params)
+        self.save_button.grid(row=6, column=0, pady=5, padx=5, sticky="ew")
 
         # Web Server Settings tab
         self.web_server_frame = ctk.CTkFrame(self.tabview.tab("Web Server"))
@@ -389,48 +417,59 @@ class App(ctk.CTk):
         self.web_server_label.grid(row=0, column=0, columnspan=2,
                                    padx=10, pady=10, sticky="")
 
+        self.server_frame = ctk.CTkFrame(self.web_server_frame)
+        self.server_frame.grid(row=2, column=0, pady=0, padx=5, sticky="ew")
+        self.server_frame.grid_columnconfigure(0, weight=0)
+        self.server_frame.grid_columnconfigure(1, weight=1)
+
+        self.server_label = ctk.CTkLabel(self.server_frame,
+                                         text="Server Interface (Address)",
+                                         font=("Arial", 8))
+        self.server_label.grid(row=0, column=0, pady=0, padx=10, sticky="w")
         self.interface_var = tk.StringVar()
-        self.interface_menu = ctk.CTkOptionMenu(self.web_server_frame,
+        self.interface_menu = ctk.CTkOptionMenu(self.server_frame,
                                                 variable=self.interface_var)
-        self.interface_menu.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
+        self.interface_menu.grid(row=1, column=0, pady=(0, 5), padx=10, sticky="ew")
         self.update_interface_menu()
 
-        self.server_port_entry = ctk.CTkEntry(self.web_server_frame, placeholder_text="Server Port")
+        self.port_label = ctk.CTkLabel(self.server_frame, text="Server Port",
+                                       font=("Arial", 8))
+        self.port_label.grid(row=2, column=0, pady=0, padx=10, sticky="w")
+        self.server_port_entry = ctk.CTkEntry(self.server_frame)
         self.server_port_entry.insert(0, str(self.cfg['server_port']))
-        self.server_port_entry.grid(row=2, column=0, pady=10, padx=10, sticky="ew")
+        self.server_port_entry.grid(row=3, column=0, pady=(0, 5), padx=10, sticky="ew")
 
-        # Server directory row
-        self.directory_frame = ctk.CTkFrame(self.web_server_frame)
-        self.directory_frame.grid(row=3, column=0, pady=10, padx=10, sticky="ew")
+        self.dir_frame = ctk.CTkFrame(self.server_frame, fg_color=self.server_frame.cget("fg_color"))
+        self.dir_frame.grid(row=4, column=0, pady=0, padx=0, sticky="ew")
 
-        self.server_path_entry = ctk.CTkEntry(self.directory_frame)
+        self.dir_label = ctk.CTkLabel(self.dir_frame,
+                                      text="Server Directory",
+                                      font=("Arial", 8))
+        self.dir_label.grid(row=0, column=0, pady=0, padx=10, sticky="w")
+
+        self.server_path_entry = ctk.CTkEntry(self.dir_frame, width=180)
         self.server_path_entry.insert(0, self.cfg['server_path'])
-        self.server_path_entry.grid(row=0, column=0, sticky="ew")
+        self.server_path_entry.grid(row=1, column=0, pady=(0, 5),
+                                    padx=(10, 0), sticky="w")
 
-        self.folder_icon = CTkImage(light_image=Image.open("icons/open.png")
-                                    .resize((20, 20), Image.LANCZOS))
-        self.directory_button = ctk.CTkButton(self.directory_frame,
-                                              image=self.folder_icon,
-                                              text="", width=40,
-                                              command=self.select_directory)
-        self.directory_button.grid(row=0, column=1, padx=(3, 0))
-
-        self.directory_frame.grid_columnconfigure(0, weight=4)
-        self.directory_frame.grid_columnconfigure(1, weight=1)
+        self.dir_button = ctk.CTkButton(self.dir_frame,
+                                        text="..", width=20,
+                                        command=self.select_directory)
+        self.dir_button.grid(row=1, column=1, pady=(0, 5), padx=(3, 5), sticky="w")
 
         if self.cfg['server_path']:
             self.server_path = self.cfg['server_path']
 
-        self.server_enabled = ctk.CTkSwitch(self.web_server_frame, text="Enabled")
-        self.server_enabled.grid(row=4, column=0, pady=10, padx=10, sticky="n")
+        self.server_enabled = ctk.CTkSwitch(self.server_frame, text="Server Enabled")
+        self.server_enabled.grid(row=6, column=0, pady=(0, 10), padx=10, sticky="n")
         if self.cfg['server_enabled']:
             self.server_enabled.select()
 
         # Save button
         self.interface_save_button = ctk.CTkButton(self.web_server_frame,
-                                                   text="Save",
+                                                   text="Apply & Save",
                                                    command=self.save_server_settings)
-        self.interface_save_button.grid(row=5, column=0, pady=20, padx=10, sticky="")
+        self.interface_save_button.grid(row=5, column=0, pady=20, padx=10, sticky="ew")
 
         # Check if theme is set to "System", otherwise use saved theme
         self.change_theme_mode_event(self.cfg['theme'])
