@@ -36,6 +36,12 @@ from ncclient.xml_ import to_ele
 
 
 APP_TITLE = "Simple NETCONF Client"
+WELCOME = "Welcome to the NETCONF client!\n\n" \
+    "Please use the buttons on the left to initiate commands.\n" \
+    "They will show RPC commands in this window and pressing\n" \
+    "the Send button will then connect to the device and show\n" \
+    "the result here.  The File Open + Save use this window.\n\n" \
+    "Connecting details for the device on the right."
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
@@ -223,6 +229,8 @@ class App(ctk.CTk):
                                        command=self.zoom_in_event)
         self.settings_menu.add_command(label="Zoom Out", accelerator="Ctrl+-",
                                        command=self.zoom_out_event)
+        self.settings_menu.add_command(label="Reset Zoom", accelerator="Ctrl+0",
+                                       command=self.reset_zoom_event)
 
         self.file_menu.add_command(label="Open", underline=0,
                                    accelerator="Ctrl+O",
@@ -254,58 +262,58 @@ class App(ctk.CTk):
         self.update_menu_icons()
 
         # left sidebar with netconf RPCs ######################################
-        self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
+        self.sidebar_frame = ctk.CTkFrame(self, width=100, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=8, sticky="nsew")
 
         self.logo = ctk.CTkLabel(self.sidebar_frame, text="NETCONF Client",
                                  font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo.grid(row=0, column=0, padx=20, pady=(20, 10))
+        self.logo.grid(row=0, column=0, padx=0, pady=(10, 10))
 
         self.factory_reset = ctk.CTkButton(self.sidebar_frame,
                                            command=self.factory_reset_cb,
                                            text="Factory Reset")
-        self.factory_reset.grid(row=1, column=0, padx=20, pady=10)
+        self.factory_reset.grid(row=1, column=0, padx=10, pady=10)
 
         self.reboot = ctk.CTkButton(self.sidebar_frame,
                                     command=self.reboot_cb,
                                     text="Reboot")
-        self.reboot.grid(row=2, column=0, padx=20, pady=10)
+        self.reboot.grid(row=2, column=0, padx=10, pady=10)
 
         self.time_set = ctk.CTkButton(self.sidebar_frame,
                                       command=self.time_set_cb,
                                       text="Set System Time")
-        self.time_set.grid(row=3, column=0, padx=20, pady=10)
+        self.time_set.grid(row=3, column=0, padx=10, pady=10)
 
         self.upgrade_file = None
         self.upgrade_button = ctk.CTkButton(self.sidebar_frame,
                                             command=self.upgrade_cb,
                                             text="Upgrade System")
-        self.upgrade_button.grid(row=4, column=0, padx=20, pady=10)
+        self.upgrade_button.grid(row=4, column=0, padx=10, pady=10)
 
         self.get_oper = ctk.CTkButton(self.sidebar_frame,
                                       command=self.get_oper_cb,
                                       text="Get Status")
-        self.get_oper.grid(row=5, column=0, padx=20, pady=10)
+        self.get_oper.grid(row=5, column=0, padx=10, pady=10)
 
         self.get_config_label = ctk.CTkLabel(self.sidebar_frame,
                                              text="Get configuration",
                                              anchor="w")
-        self.get_config_label.grid(row=6, column=0, padx=20, pady=(30, 0))
+        self.get_config_label.grid(row=6, column=0, padx=10, pady=(30, 0))
         self.get_config_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                    command=self.get_config_cb,
                                                    values=["Running",
                                                            "Startup"])
-        self.get_config_button.grid(row=7, column=0, padx=20, pady=0)
+        self.get_config_button.grid(row=7, column=0, padx=10, pady=0)
 
         self.profinet_label = ctk.CTkLabel(self.sidebar_frame,
                                            text="PROFINET Configuration",
                                            anchor="w")
-        self.profinet_label.grid(row=8, column=0, padx=20, pady=(30, 0))
+        self.profinet_label.grid(row=8, column=0, padx=10, pady=(30, 0))
         self.profinet_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                  command=self.profinet_cb,
                                                  values=["Enable",
                                                          "Disable"])
-        self.profinet_button.grid(row=9, column=0, padx=20, pady=0)
+        self.profinet_button.grid(row=9, column=0, padx=10, pady=0)
 
         # main XML textbox ####################################################
         self.textbox = ctk.CTkTextbox(self, width=250, font=("Courier", 13))
@@ -478,15 +486,11 @@ class App(ctk.CTk):
         # set default values
         self.rpc_cb = None
         self.textbox.delete(0.0, 'end')
-        self.textbox.insert("0.0", "Welcome to the NETCONF client!\n\n"
-                            "Please use the buttons on the left to initiate "
-                            "commands.  They will show RPC commands in this "
-                            "window and pressing Send will then connect to "
-                            "the device and show the commend result here.\n\n"
-                            "Connecting details for the device on the right.")
+        self.textbox.insert("0.0", WELCOME)
 
         self.bind("<Control-plus>", lambda event: self.zoom_in_event())
         self.bind("<Control-minus>", lambda event: self.zoom_out_event())
+        self.bind("<Control-0>", lambda event: self.reset_zoom_event())
         self.bind("<Control-o>", lambda event: self.open_file())
         self.bind("<Control-s>", lambda event: self.save_file())
         self.bind("<Control-q>", lambda event: self.quit())
@@ -791,6 +795,10 @@ class App(ctk.CTk):
             new_zoom = current_zoom - 10
             self.change_scaling_event(f"{new_zoom}%")
             self.zoom_var.set(f"{new_zoom}%")
+
+    def reset_zoom_event(self):
+        self.change_scaling_event("100%")
+        self.zoom_var.set("100%")
 
     def open_file(self):
         files = [('XML File', '*.xml')]
