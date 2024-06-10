@@ -30,6 +30,7 @@ import customtkinter as ctk
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
 from ncclient.xml_ import to_ele
+from lxml.etree import XMLSyntaxError, DocumentInvalid
 
 
 APP_TITLE = "Simple NETCONF Client"
@@ -1111,13 +1112,23 @@ class App(ctk.CTk):
             if m is None:
                 return
             try:
-                send_res = m.edit_config(target='running',
-                                         config=self.textbox.get('1.0', END))
-                dom = parseString(send_res.xml)
-                print(dom.toprettyxml())
-                response = m.copy_config(source='running', target='startup')
+                # Generic RPC composed manually
+                try:
+                    rpc = to_ele(self.textbox.get('1.0', END))
+                except XMLSyntaxError as err:
+                    self.error(f"XML Syntax Error: {err}")
+                    return
+                except DocumentInvalid as err:
+                    self.error(f"Document Invalid: {err}")
+                    return
+                except TypeError as err:
+                    self.error(f"Type Error: {err}")
+                    return
 
+                response = m.dispatch(rpc, source=None, filter=None)
                 if response.ok:
+                    data = self.extract_xml_data(response.xml)
+                    self.show(data)
                     self.status("Command run successfully!")
                 else:
                     self.error(str(response))
