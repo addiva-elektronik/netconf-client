@@ -80,6 +80,7 @@ class AboutDialog(ctk.CTkToplevel):
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
         self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
 
 class LicenseDialog(ctk.CTkToplevel):
     def __init__(self, parent, width, height):
@@ -97,12 +98,20 @@ class LicenseDialog(ctk.CTkToplevel):
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
         self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
+
 
 class UsageDialog(ctk.CTkToplevel):
-    def __init__(self, parent, content, width, height):
+    def __init__(self, parent, content, width=800, height=600):
         super().__init__(parent)
+        self.parent = parent
+
         self.title("Usage")
         parent.center_dialog(self, width, height)
+
+        # Initialize history tracking
+        self.history = []
+        self.history_index = -1
 
         # Apply dark mode CSS if needed
         css = """
@@ -121,25 +130,117 @@ class UsageDialog(ctk.CTkToplevel):
         blockquote { border-left: 4px solid #0000ff; padding-left: 10px; margin-left: 0; color: #555; }
         """
 
-        extensions = ['fenced_code', 'codehilite', 'extra']
-        html_content = f"""
+        self.html_content = f"""
         <html>
         <head>
             <style>{css}</style>
         </head>
         <body>
-            {markdown.markdown(content, extensions=extensions)}
+            {markdown.markdown(content, extensions=['fenced_code', 'codehilite', 'extra'])}
         </body>
         </html>
         """
 
-        html_frame = HtmlFrame(self, horizontal_scrollbar="auto", messages_enabled=False)
-        html_frame.load_html(html_content)
-        html_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.html_frame = HtmlFrame(self, horizontal_scrollbar="auto", messages_enabled=False)
+        self.html_frame.load_html(self.html_content)
+        self.html_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
-        close_button.pack(pady=10)
-        self.bind("<Control-w>", lambda event: self.destroy())
+        # Back and Forward buttons
+        self.button_frame = ctk.CTkFrame(self)
+        self.button_frame.pack(fill="x", padx=10, pady=5)
+
+        self.back_button = ctk.CTkButton(self.button_frame, text="Back", command=self.go_back)
+        self.back_button.pack(side="left", padx=5)
+        self.back_button.configure(state="disabled")
+
+        self.forward_button = ctk.CTkButton(self.button_frame, text="Forward", command=self.go_forward)
+        self.forward_button.pack(side="left", padx=5)
+        self.forward_button.configure(state="disabled")
+
+        self.close_button = ctk.CTkButton(self.button_frame, text="Close", command=self.destroy)
+        self.close_button.pack(side="right", pady=10)
+
+        # Add initial content to history
+        self.add_to_history(self.html_content, is_url=False)
+
+        # Hook into link loader
+        self.html_frame.on_link_click(self.load_html_content)
+
+        # Bind mouse back/forward buttons
+        #self.bind("<Button-8>", self.on_back_button)
+        #self.bind("<Button-9>", self.on_forward_button)
+
+        self.html_frame.bind_all("<Alt-Left>", self.on_back_button)
+        self.html_frame.bind_all("<Alt-Right>", self.on_forward_button)
+
+        # Bind key events for scrolling and closing
+        self.html_frame.bind_all("<Up>", lambda e: self.html_frame.yview_scroll(-5, "units"))
+        self.html_frame.bind_all("<Down>", lambda e: self.html_frame.yview_scroll(5, "units"))
+        self.html_frame.bind_all("<Prior>", lambda e: self.html_frame.yview_scroll(-1, "pages"))
+        self.html_frame.bind_all("<Next>", lambda e: self.html_frame.yview_scroll(1, "pages"))
+        self.html_frame.bind_all("<Home>", lambda e: self.html_frame.yview_moveto(0))
+        self.html_frame.bind_all("<End>", lambda e: self.html_frame.yview_moveto(1))
+        self.html_frame.bind("<Control-w>", lambda event: self.destroy())
+        self.html_frame.bind("<Escape>", lambda event: self.destroy())
+
+        # Bind right-click on links to copy URL
+        self.html_frame.bind("<Button-3>", self.on_right_click)
+
+        self.html_frame.focus_set()
+        self.html_frame.focus_force()
+
+    def add_to_history(self, content, is_url):
+        if self.history_index == -1 or (self.history and self.history[self.history_index] != content):
+            self.history = self.history[:self.history_index + 1]
+            self.history.append((content, is_url))
+            self.history_index += 1
+
+        self.update_navigation_buttons()
+
+    def load_html_content(self, content):
+        if content.startswith("http://") or content.startswith("https://"):
+            self.html_frame.load_url(content)
+            self.add_to_history(content, is_url=True)
+        else:
+            self.html_frame.load_html(content)
+            self.add_to_history(content, is_url=False)
+
+    def go_back(self):
+        if self.history_index > 0:
+            self.history_index -= 1
+            content, is_url = self.history[self.history_index]
+            if is_url:
+                self.html_frame.load_url(content)
+            else:
+                self.html_frame.load_html(content)
+        self.update_navigation_buttons()
+
+    def go_forward(self):
+        if self.history_index < len(self.history) - 1:
+            self.history_index += 1
+            content, is_url = self.history[self.history_index]
+            if is_url:
+                self.html_frame.load_url(content)
+            else:
+                self.html_frame.load_html(content)
+        self.update_navigation_buttons()
+
+    def update_navigation_buttons(self):
+        self.back_button.configure(state="normal" if self.history_index > 0 else "disabled")
+        self.forward_button.configure(state="normal" if self.history_index < len(self.history) - 1 else "disabled")
+
+    def on_back_button(self, event):
+        self.go_back()
+
+    def on_forward_button(self, event):
+        self.go_forward()
+
+    def on_right_click(self, event):
+        url = self.html_frame.get_current_link(resolve=True)
+        if url:
+            self.clipboard_clear()
+            self.clipboard_append(url)
+            self.parent.status(f"copied {url} to clipboard.")
 
 
 class ConfigManager:
@@ -1010,8 +1111,6 @@ class App(ctk.CTk):
 
         close_button = ctk.CTkButton(dialog, text="Close", command=dialog.destroy)
         close_button.pack(pady=10)
-
-        dialog.bind("<Control-w>", lambda event: dialog.destroy())
 
     # CONNECTION PARAMETERS METHODS
     def save_params(self):
