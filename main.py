@@ -117,7 +117,7 @@ class NetconfConnection:
                                            hostkey_verify=False,
                                            allow_agent=self.cfg['ssh-agent'],
                                            timeout=30)
-            self.app.status(f"Connected to NETCONF server {host}.")
+            logging.info(f"Connected to NETCONF server {host}.")
             return self.manager
         except AuthenticationError as err:
             self.app.error(f"Authentication with {host} failed: {err}")
@@ -130,7 +130,7 @@ class NetconfConnection:
     def __exit__(self, exc_type, exc_value, traceback):
         if self.manager is not None:
             self.manager.close_session()
-            self.app.status("Disconnected from NETCONF server")
+            logging.info("Disconnected from NETCONF server")
 
 
 class ZeroconfListener:
