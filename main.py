@@ -296,22 +296,45 @@ class App(ctk.CTk):
         self.get_config_label = ctk.CTkLabel(self.sidebar_frame,
                                              text="Get configuration",
                                              anchor="w")
-        self.get_config_label.grid(row=6, column=0, padx=10, pady=(30, 0))
+        self.get_config_label.grid(row=6, column=0, padx=10, pady=(10, 0))
         self.get_config_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                    command=self.get_config_cb,
                                                    values=["Running",
                                                            "Startup"])
         self.get_config_button.grid(row=7, column=0, padx=10, pady=0)
 
+        self.cp = ctk.CTkFrame(self.sidebar_frame,
+                               fg_color=self.sidebar_frame.cget("fg_color"))
+        self.cp.grid(row=8, column=0, pady=0, padx=0, sticky="ew")
+
+        self.get_config_label = ctk.CTkLabel(self.cp,
+                                             text="Put configuration",
+                                             anchor="w")
+        self.get_config_label.grid(row=0, column=0, columnspan=2,
+                                   padx=10, pady=(10, 0))
+
+        self.target = "running"
+        self.put_config = ctk.CTkOptionMenu(self.cp,
+                                            command=self.put_config_cb,
+                                            width=98,
+                                            values=["Running",
+                                                    "Startup"])
+        self.put_config.grid(row=1, column=0, padx=(16, 0), pady=10, sticky="w")
+
+        self.save = ctk.CTkButton(self.cp, width=30,
+                                  command=self.copy_config,
+                                  text="Save")
+        self.save.grid(row=1, column=1, padx=(0, 15), pady=10, sticky="w")
+
         self.profinet_label = ctk.CTkLabel(self.sidebar_frame,
                                            text="PROFINET Configuration",
                                            anchor="w")
-        self.profinet_label.grid(row=8, column=0, padx=10, pady=(30, 0))
+        self.profinet_label.grid(row=10, column=0, padx=10, pady=(10, 0))
         self.profinet_button = ctk.CTkOptionMenu(self.sidebar_frame,
                                                  command=self.profinet_cb,
                                                  values=["Enable",
                                                          "Disable"])
-        self.profinet_button.grid(row=9, column=0, padx=10, pady=0)
+        self.profinet_button.grid(row=11, column=0, padx=10, pady=0)
 
         # main XML textbox ####################################################
         self.textbox = ctk.CTkTextbox(self, width=250, font=("Courier", 13))
@@ -758,8 +781,11 @@ class App(ctk.CTk):
     def error(self, message):
         self._update_status(message, error=True)
 
-    def show(self, text):
+    def clear(self):
         self.textbox.delete(0.0, 'end')
+
+    def show(self, text):
+        self.clear()
         self.textbox.insert("0.0", text)
 
     def open_input_dialog_event(self):
@@ -972,8 +998,62 @@ class App(ctk.CTk):
                 response = m.get_config(source=config)
                 data = self.extract_xml_data(response.xml)
                 self.show(data)
+                self.status(f"showing {config}-config.")
             except Exception as err:
                 self.error(f"Failed fetching configuration: {err}")
+                print(err)
+
+    def put_config_cb(self, config):
+        config = str(config).lower()
+        fn = filedialog.askopenfilename(
+            title="Select config file",
+            filetypes=[("XML files", "*.xml")]
+        )
+        if fn:
+            try:
+                with open(fn, 'r') as file:
+                    data = file.read()
+                self.show(data)
+                self.target = config
+                self.rpc(f"Copy (backup) file to {config}-config",
+                         self.execute_put_config)
+            except Exception as e:
+                self.error(f"Failed to load config file {fn}: {e}")
+
+    def execute_put_config(self):
+        self.status(f"Restoring {self.target} configuration, please wait ...")
+
+        # Wrap the extracted data in the required XML framing
+        config_data = f"""
+        <nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+            {self.textbox.get("1.0", END)}
+        </nc:config>
+        """
+        self.clear()
+
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+
+            try:
+                m.edit_config(target=self.target, config=config_data)
+                self.status(f"Configuration saved to {self.target}-config!")
+            except Exception as err:
+                self.error(f"Failed to save {self.target}-config: {err}")
+                print(err)
+
+    def copy_config(self):
+        self.clear()
+        self.status("Calling 'copy running-config startup-config', please wait ...")
+        with NetconfConnection(self.cfg, self) as m:
+            if m is None:
+                return
+            try:
+                # Copy running configuration to startup configuration
+                m.copy_config(source='running', target='startup')
+                self.status("running configuration saved to startup.")
+            except Exception as err:
+                self.error(f"Failed to save configuration: {err}")
                 print(err)
 
     # Operational method(s)
@@ -994,6 +1074,7 @@ class App(ctk.CTk):
                 response = m.dispatch(rpc, source=None, filter=None)
                 data = self.extract_xml_data(response.xml)
                 self.show(data)
+                self.status("showing (filtered) operational datastore.")
             except Exception as err:
                 self.error(f"Failed fetching operational: {err}")
                 print(err)
@@ -1014,6 +1095,7 @@ class App(ctk.CTk):
                 self.status("Please wait while device reboots ...")
                 response = m.dispatch(rpc, source=None, filter=None)
                 self.show(response)
+                self.status("done.")
             except Exception as err:
                 self.error(f"Failed reboot: {err}")
                 print(err)
@@ -1031,6 +1113,7 @@ class App(ctk.CTk):
                 rpc = to_ele(self.textbox.get("1.0", END))
                 response = m.dispatch(rpc, source=None, filter=None)
                 self.show(response)
+                self.status("done.")
             except Exception as err:
                 self.error(f"Failed factory reset: {err}")
                 print(err)
@@ -1050,6 +1133,7 @@ class App(ctk.CTk):
             try:
                 response = m.dispatch(rpc, source=None, filter=None)
                 self.show(response)
+                self.status("done.")
             except Exception as err:
                 self.error(f"{err}")
                 print(err)
