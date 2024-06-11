@@ -76,12 +76,21 @@ class AboutDialog(ctk.CTkToplevel):
             "This program is available for free as\n"
             "open source under the MIT license.\n"
         )
-        label = ctk.CTkLabel(self, text=about_message)
+        label = ctk.CTkLabel(self, text=about_message, font=("Arial", 16))
         label.pack(padx=20, pady=20)
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
+
+        # Allow closing with common key bindings
         self.bind("<Control-w>", lambda event: self.destroy())
         self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
 
 class LicenseDialog(ctk.CTkToplevel):
     def __init__(self, parent, width, height):
@@ -94,12 +103,22 @@ class LicenseDialog(ctk.CTkToplevel):
             "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\n"
             "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
         )
-        label = ctk.CTkLabel(self, text=license_message, wraplength=580)
+        label = ctk.CTkLabel(self, text=license_message,
+                             font=("Arial", 16),
+                             wraplength=580)
         label.pack(padx=20, pady=20)
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
+
+        # Allow closing with common key bindings
         self.bind("<Control-w>", lambda event: self.destroy())
         self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
 
 
 class UsageDialog(ctk.CTkToplevel):
@@ -181,14 +200,21 @@ class UsageDialog(ctk.CTkToplevel):
         self.html_frame.bind_all("<Next>", lambda e: self.html_frame.yview_scroll(1, "pages"))
         self.html_frame.bind_all("<Home>", lambda e: self.html_frame.yview_moveto(0))
         self.html_frame.bind_all("<End>", lambda e: self.html_frame.yview_moveto(1))
-        self.html_frame.bind("<Control-w>", lambda event: self.destroy())
-        self.html_frame.bind("<Escape>", lambda event: self.destroy())
+        self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
 
         # Bind right-click on links to copy URL
         self.html_frame.bind("<Button-3>", self.on_right_click)
 
-        self.html_frame.focus_set()
-        self.html_frame.focus_force()
+        # Bring frame into foreground and focus it when it becomes visible
+        self.html_frame.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
+    def dummy(self, event):
+        return
 
     def add_to_history(self, content, is_url):
         if self.history_index == -1 or (self.history and self.history[self.history_index] != content):
@@ -715,10 +741,15 @@ class App(ctk.CTk):
         self.bind("<Control-q>", lambda event: self.quit())
         self.bind("<Control-h>", lambda event: self.show_usage())
 
-        self.focus_set()
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
 
         # Start the web server if enabled in a previous run.
         self.start_file_server()
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
 
     def scan_devices(self):
         # Initialize Zeroconf and start scanning for _netconf-ssh._tcp devices
