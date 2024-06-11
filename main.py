@@ -1360,19 +1360,25 @@ class App(ctk.CTk):
 
     # UPGRADE METHODS
     def upgrade_cb(self):
-        self.upgrade_file = filedialog.askopenfilename(
-            initialdir=self.server_path,
-            title="Select Upgrade Image",
-            filetypes=[("Upgrade Package", "*.pkg")])
-        if not self.upgrade_file:
-            self.error("No upgrade image selected!")
-            return
+        try:
+            self.upgrade_file = filedialog.askopenfilename(
+                initialdir=self.server_path,
+                title="Select Upgrade Image",
+                filetypes=[("Upgrade Package", "*.pkg")])
+            if not self.upgrade_file:
+                self.error("No upgrade image selected!")
+                return
 
-        (_, host_ip) = self.get_iface_ip()
-        host_port = self.cfg['server_port']
-        pkg = os.path.basename(self.upgrade_file)
+            (_, host_ip) = self.get_iface_ip()
+            host_port = self.cfg['server_port']
+            pkg = os.path.basename(self.upgrade_file)
 
-        url = f"http://{host_ip}:{host_port}/{pkg}"
+            url = f"http://{host_ip}:{host_port}/{pkg}"
+
+        except Exception as err:
+            self.error(f"Set up Web Server first: {err}")
+            url = "http://<HOST>[:PORT]/firmware-image-version.pkg"
+
         logging.debug(f"Upgrade URL: {url}")
 
         rpc = f"""<install-bundle xmlns="urn:infix:system:ns:yang:1.0">
