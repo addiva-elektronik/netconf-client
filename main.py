@@ -41,7 +41,17 @@ WELCOME = "Welcome to the NETCONF client!\n\n" \
     "They will show RPC commands in this window and pressing\n" \
     "the Send button will then connect to the device and show\n" \
     "the result here.  The File Open + Save use this window.\n\n" \
-    "Connecting details for the device on the right."
+    "Connecting details for the device on the right.\n\n" \
+    "Recommended (fool proof) procedure for upgrade:\n" \
+    " - Backup startup-config to PC\n" \
+    " - Set up web server:\n" \
+    "   - Select server iterface\n" \
+    "   - Select directory with .pkg file(s)\n" \
+    " - Upgrade, select .pkg file, remember to click Send\n" \
+    " - Factory reset device\n" \
+    " - Reboot\n" \
+    " - Verify device comes back up\n" \
+    " - Verify upgrade \"took\", check version with Get Status\n"
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
