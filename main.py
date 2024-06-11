@@ -331,7 +331,10 @@ class ZeroconfListener:
             hostname = info.server if info.server else name
             for address in addresses:
                 self.devices.append((hostname, address, info.port))
-            self.app.update_device_list(self.devices)
+            if not self.app.scan_handled:
+                logging.info("Found device, done.")
+                self.app.scan_handled = True
+                self.app.update_device_list(self.devices)
 
     def update_service(self, zeroconf, type, name):
         pass
@@ -722,7 +725,26 @@ class App(ctk.CTk):
         self.zeroconf = Zeroconf()
         self.listener = ZeroconfListener(self)
         self.browser = ServiceBrowser(self.zeroconf, "_netconf-ssh._tcp.local.", self.listener)
-        self.status("Scanning for devices...")
+        self.status("Scanning for devices, 5 sec ...")
+        self.scan_handled = False
+
+        # Time out after 5 sec.
+        self.after(5000, self.check_scan_results)
+
+    def check_scan_results(self):
+        if self.scan_handled:
+            return
+
+        logging.info("Find device timeout.")
+        self.scan_handled = True
+        self.zeroconf.close()
+
+        if not self.listener.devices:
+            self.status("No devices found.")
+            messagebox.showinfo("Scan Results", "No devices found.")
+        else:
+            self.update_device_list(self.listener.devices)
+            self.status(f"Found {len(self.listener.devices)} device(s).")
 
     def update_device_list(self, devices):
         # Create a dialog to show the list of devices
