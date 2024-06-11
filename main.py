@@ -302,12 +302,12 @@ class NetconfConnection:
                                            hostkey_verify=False,
                                            allow_agent=self.cfg['ssh-agent'],
                                            timeout=30)
-            logging.info(f"Connected to NETCONF server {host}.")
+            logging.info("Connected to NETCONF server %s.", host)
             return self.manager
         except AuthenticationError as err:
             self.app.error(f"Authentication with {host} failed: {err}")
         except SSHError as err:
-            self.app.error(f"SSH connection to {host} port {port} failed: {err}")
+            self.app.error(f"SSH connection to {host}:{port} failed: {err}")
         except Exception as err:
             self.app.error(f"An unexpected error occurred: {err}")
             raise err
@@ -1379,7 +1379,7 @@ class App(ctk.CTk):
             self.error(f"Set up Web Server first: {err}")
             url = "http://<HOST>[:PORT]/firmware-image-version.pkg"
 
-        logging.debug(f"Upgrade URL: {url}")
+        logging.debug("Upgrade URL: %s", url)
 
         rpc = f"""<install-bundle xmlns="urn:infix:system:ns:yang:1.0">
     <url>{url}</url>
