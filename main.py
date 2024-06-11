@@ -15,6 +15,7 @@ import platform
 import http.server
 import socketserver
 import socket
+import signal
 import logging
 import threading
 import tkinter as tk
@@ -1462,8 +1463,15 @@ def setup_logging(debug_enabled):
 
 
 if __name__ == "__main__":
+    def signal_handler(sig, _):
+        print(f"Caught signal {sig}, exiting.")
+        app.quit()
+        sys.exit(0)
+
     args = parse_args()
     setup_logging(args.debug)
+
+    signal.signal(signal.SIGINT, signal_handler)
 
     app = App()
     app.mainloop()
