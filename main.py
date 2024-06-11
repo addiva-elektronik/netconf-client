@@ -1200,8 +1200,8 @@ class App(ctk.CTk):
 
             inner_xml = "\n".join(lines)
             return inner_xml
-        except Exception as e:
-            self.error(f"Error extracting data from XML: {e}")
+        except Exception as err:
+            self.error(f"Error extracting data from XML: {err}")
             return None
 
     def get_config_cb(self, config):
@@ -1237,8 +1237,8 @@ class App(ctk.CTk):
                 self.target = config
                 self.rpc(f"Copy (backup) file to {config}-config",
                          self.execute_put_config)
-            except Exception as e:
-                self.error(f"Failed to load config file {fn}: {e}")
+            except Exception as err:
+                self.error(f"Failed to load config file {fn}: {err}")
 
     def execute_put_config(self):
         self.status(f"Restoring {self.target} configuration, please wait ...")
