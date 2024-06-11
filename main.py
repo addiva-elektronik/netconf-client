@@ -815,7 +815,7 @@ class App(ctk.CTk):
             self.server_path_entry.insert(0, str(self.cfg['server_path']))
             self.cfg_mgr.save()
             self.restart_file_server()
-            self.status(f"Serving files from: {self.server_path}")
+            self.status(f"HTTP server, serving files from: {self.server_path}")
 
     def get_interfaces(slf):
         interfaces = psutil.net_if_addrs()
@@ -882,7 +882,7 @@ class App(ctk.CTk):
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
-        self.status(f"Serving files on {interface}:{port}")
+        self.status(f"HTTP server, serving files on {interface}:{port}")
         return True
 
     def restart_file_server(self):
