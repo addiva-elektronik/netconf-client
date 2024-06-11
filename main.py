@@ -389,6 +389,16 @@ class ScanResultsDialog(ctk.CTkToplevel):
                                        command=self.on_ok)
         self.ok_button.pack(side="right", padx=10, pady=10)
 
+        # Allow closing with common key bindings
+        self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
     def update_listbox(self):
         self.listbox.delete(0, END)
         for name, ip, port in self.devices:
