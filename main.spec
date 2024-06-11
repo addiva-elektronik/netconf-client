@@ -1,11 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('disable-profinet.xml', '.'), ('enable-profinet.xml', '.')],
+    datas=[('disable-profinet.xml', '.'),
+           ('enable-profinet.xml', '.'),
+           ('open.png', 'icons'),
+           ('save.png', 'icons'),
+           ('close.png', 'icons'),
+           ('transparent.png', 'icons'),
+           ('usage.md', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
