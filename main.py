@@ -348,7 +348,7 @@ class NetconfConnection:
 class ZeroconfListener:
     def __init__(self, app):
         self.app = app
-        self.devices = []
+        self.devices = {}
 
     def add_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
@@ -356,38 +356,44 @@ class ZeroconfListener:
             addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
             hostname = info.server if info.server else name
             for address in addresses:
-                self.devices.append((hostname, address, info.port))
-            if not self.app.scan_handled:
-                logging.info("Found device, done.")
-                self.app.scan_handled = True
-                self.app.update_device_list(self.devices)
+                self.devices[name] = (hostname, address, info.port)
+
+            self.app.update_device_list(self.devices)
 
     def update_service(self, zeroconf, type, name):
         pass
 
     def remove_service(self, zeroconf, type, name):
-        pass
+        if name in self.devices:
+            del self.devices[name]
+            self.app.update_device_list(self.devices.values())
 
 
 class ScanResultsDialog(ctk.CTkToplevel):
     def __init__(self, parent, devices):
         super().__init__(parent)
-        self.title("Scan Results")
+        self.title("mDNS-SD - Select NETCONF Device")
         self.geometry("400x300")
         self.devices = devices
         self.selected_device = None
 
         self.listbox = Listbox(self)
         self.listbox.pack(fill="both", expand=True, padx=10, pady=10)
+        self.update_listbox()
+
+        self.cancel_button = ctk.CTkButton(self, text="Cancel",
+                                           command=self.on_cancel)
+        self.cancel_button.pack(side="left", padx=10, pady=10)
+
+        self.ok_button = ctk.CTkButton(self, text="OK",
+                                       command=self.on_ok)
+        self.ok_button.pack(side="right", padx=10, pady=10)
+
+    def update_listbox(self):
+        self.listbox.delete(0, END)
         for name, ip, port in self.devices:
             name = name.rstrip('.')
             self.listbox.insert('end', f"{name} - {ip}:{port}")
-
-        self.cancel_button = ctk.CTkButton(self, text="Cancel", command=self.on_cancel)
-        self.cancel_button.pack(side="left", padx=10, pady=10)
-
-        self.ok_button = ctk.CTkButton(self, text="OK", command=self.on_ok)
-        self.ok_button.pack(side="right", padx=10, pady=10)
 
     def on_ok(self):
         selection = self.listbox.curselection()
@@ -403,6 +409,7 @@ class App(ctk.CTk):
     def __init__(self):
         self.cfg_mgr = ConfigManager()
         self.cfg = self.cfg_mgr.cfg
+        self.devices = []
         super().__init__()
 
         self.title(APP_TITLE)
@@ -747,52 +754,47 @@ class App(ctk.CTk):
         # Start the web server if enabled in a previous run.
         self.start_file_server()
 
+        # Start mDNS-SD scanning in background.
+        self.start_zeroconf_scanner()
+
     def on_map(self, event):
         self.lift()
         self.focus_force()
 
-    def scan_devices(self):
-        # Initialize Zeroconf and start scanning for _netconf-ssh._tcp devices
+    def start_zeroconf_scanner(self):
+        """mDNS-SD scanner.  Tracks available NETCONF (XML/SSH) devices."""
+        svc = "_netconf-ssh._tcp.local."
+
         self.zeroconf = Zeroconf()
         self.listener = ZeroconfListener(self)
-        self.browser = ServiceBrowser(self.zeroconf, "_netconf-ssh._tcp.local.", self.listener)
-        self.status("Scanning for devices, 5 sec ...")
-        self.scan_handled = False
-
-        # Time out after 5 sec.
-        self.after(5000, self.check_scan_results)
-
-    def check_scan_results(self):
-        if self.scan_handled:
-            return
-
-        logging.info("Find device timeout.")
-        self.scan_handled = True
-        self.zeroconf.close()
-
-        if not self.listener.devices:
-            self.status("No devices found.")
-            messagebox.showinfo("Scan Results", "No devices found.")
-        else:
-            self.update_device_list(self.listener.devices)
-            self.status(f"Found {len(self.listener.devices)} device(s).")
+        self.browser = ServiceBrowser(self.zeroconf, svc,
+                                      self.listener)
+        self.status(f"mDNS-SD scanning for {svc} capable devices ...")
 
     def update_device_list(self, devices):
-        # Create a dialog to show the list of devices
-        dialog = ScanResultsDialog(self, devices)
-        self.wait_window(dialog)
-        if dialog.selected_device:
-            name, ip, port = dialog.selected_device
-            name = name.rstrip('.')
-            self.cfg['addr'] = ip
-            self.cfg['port'] = port
-            self.entries['addr'].delete(0, 'end')
-            self.entries['addr'].insert(0, ip)
-            self.entries['port'].delete(0, 'end')
-            self.entries['port'].insert(0, str(port))
-            self.status(f"using {name} ({ip}:{port})")
+        self.devices = list(devices.values())
+
+    def show_device_list(self):
+        if not self.devices:
+            messagebox.showinfo("mDNS-SD Scan Results", "No NETCONF capable devices found.")
         else:
-            self.status("canceled.")
+            dialog = ScanResultsDialog(self, self.devices)
+            self.wait_window(dialog)
+            if dialog.selected_device:
+                name, ip, port = dialog.selected_device
+                name = name.rstrip('.')
+                self.cfg['addr'] = ip
+                self.cfg['port'] = port
+                self.entries['addr'].delete(0, 'end')
+                self.entries['addr'].insert(0, ip)
+                self.entries['port'].delete(0, 'end')
+                self.entries['port'].insert(0, str(port))
+                self.status(f"Using {name} ({ip}:{port})")
+            else:
+                self.status("Cancelled.")
+
+    def scan_devices(self):
+        self.show_device_list()
 
     def select_directory(self):
         directory = filedialog.askdirectory(initialdir=self.server_path)
