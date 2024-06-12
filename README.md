@@ -4,8 +4,11 @@ This application is a NETCONF client with a user-friendly UI, built with
 Python and customtkinter library, for interacting with NETCONF-enabled
 devices.
 
+![](img/screenshot.png)
+
 For help, see the built-in [Usage Instructions](usage.md).
 
+![](img/usage.png)
 
 ## Cloning
 
