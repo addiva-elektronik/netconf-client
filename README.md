@@ -79,7 +79,7 @@ Application can be run on Windows, Linux & MacOS.
 ### Building .exe for Windows
 
 ``` 
-pyinstaller --onefile --windowed --add-data "disable-profinet.xml:." --add-data "enable-profinet.xml:." main.py
+pyinstaller main.spec
 ```
 
 ## Contributing
