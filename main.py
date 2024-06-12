@@ -41,7 +41,17 @@ WELCOME = "Welcome to the NETCONF client!\n\n" \
     "They will show RPC commands in this window and pressing\n" \
     "the Send button will then connect to the device and show\n" \
     "the result here.  The File Open + Save use this window.\n\n" \
-    "Connecting details for the device on the right."
+    "Connecting details for the device on the right.\n\n" \
+    "Recommended (fool proof) procedure for upgrade:\n" \
+    " - Backup startup-config to PC\n" \
+    " - Set up web server:\n" \
+    "   - Select server iterface\n" \
+    "   - Select directory with .pkg file(s)\n" \
+    " - Upgrade, select .pkg file, remember to click Send\n" \
+    " - Factory reset device\n" \
+    " - Reboot\n" \
+    " - Verify device comes back up\n" \
+    " - Verify upgrade \"took\", check version with Get Status\n"
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
@@ -76,12 +86,21 @@ class AboutDialog(ctk.CTkToplevel):
             "This program is available for free as\n"
             "open source under the MIT license.\n"
         )
-        label = ctk.CTkLabel(self, text=about_message)
+        label = ctk.CTkLabel(self, text=about_message, font=("Arial", 16))
         label.pack(padx=20, pady=20)
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
+
+        # Allow closing with common key bindings
         self.bind("<Control-w>", lambda event: self.destroy())
         self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
 
 class LicenseDialog(ctk.CTkToplevel):
     def __init__(self, parent, width, height):
@@ -94,12 +113,22 @@ class LicenseDialog(ctk.CTkToplevel):
             "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\n"
             "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
         )
-        label = ctk.CTkLabel(self, text=license_message, wraplength=580)
+        label = ctk.CTkLabel(self, text=license_message,
+                             font=("Arial", 16),
+                             wraplength=580)
         label.pack(padx=20, pady=20)
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
+
+        # Allow closing with common key bindings
         self.bind("<Control-w>", lambda event: self.destroy())
         self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
 
 
 class UsageDialog(ctk.CTkToplevel):
@@ -181,14 +210,21 @@ class UsageDialog(ctk.CTkToplevel):
         self.html_frame.bind_all("<Next>", lambda e: self.html_frame.yview_scroll(1, "pages"))
         self.html_frame.bind_all("<Home>", lambda e: self.html_frame.yview_moveto(0))
         self.html_frame.bind_all("<End>", lambda e: self.html_frame.yview_moveto(1))
-        self.html_frame.bind("<Control-w>", lambda event: self.destroy())
-        self.html_frame.bind("<Escape>", lambda event: self.destroy())
+        self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
 
         # Bind right-click on links to copy URL
         self.html_frame.bind("<Button-3>", self.on_right_click)
 
-        self.html_frame.focus_set()
-        self.html_frame.focus_force()
+        # Bring frame into foreground and focus it when it becomes visible
+        self.html_frame.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
+    def dummy(self, event):
+        return
 
     def add_to_history(self, content, is_url):
         if self.history_index == -1 or (self.history and self.history[self.history_index] != content):
@@ -322,7 +358,7 @@ class NetconfConnection:
 class ZeroconfListener:
     def __init__(self, app):
         self.app = app
-        self.devices = []
+        self.devices = {}
 
     def add_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
@@ -330,35 +366,54 @@ class ZeroconfListener:
             addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
             hostname = info.server if info.server else name
             for address in addresses:
-                self.devices.append((hostname, address, info.port))
+                self.devices[name] = (hostname, address, info.port)
+
             self.app.update_device_list(self.devices)
 
     def update_service(self, zeroconf, type, name):
         pass
 
     def remove_service(self, zeroconf, type, name):
-        pass
+        if name in self.devices:
+            del self.devices[name]
+            self.app.update_device_list(self.devices.values())
 
 
 class ScanResultsDialog(ctk.CTkToplevel):
     def __init__(self, parent, devices):
         super().__init__(parent)
-        self.title("Scan Results")
+        self.title("mDNS-SD - Select NETCONF Device")
         self.geometry("400x300")
         self.devices = devices
         self.selected_device = None
 
         self.listbox = Listbox(self)
         self.listbox.pack(fill="both", expand=True, padx=10, pady=10)
+        self.update_listbox()
+
+        self.cancel_button = ctk.CTkButton(self, text="Cancel",
+                                           command=self.on_cancel)
+        self.cancel_button.pack(side="left", padx=10, pady=10)
+
+        self.ok_button = ctk.CTkButton(self, text="OK",
+                                       command=self.on_ok)
+        self.ok_button.pack(side="right", padx=10, pady=10)
+
+        # Allow closing with common key bindings
+        self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
+    def update_listbox(self):
+        self.listbox.delete(0, END)
         for name, ip, port in self.devices:
             name = name.rstrip('.')
             self.listbox.insert('end', f"{name} - {ip}:{port}")
-
-        self.cancel_button = ctk.CTkButton(self, text="Cancel", command=self.on_cancel)
-        self.cancel_button.pack(side="left", padx=10, pady=10)
-
-        self.ok_button = ctk.CTkButton(self, text="OK", command=self.on_ok)
-        self.ok_button.pack(side="right", padx=10, pady=10)
 
     def on_ok(self):
         selection = self.listbox.curselection()
@@ -374,6 +429,7 @@ class App(ctk.CTk):
     def __init__(self):
         self.cfg_mgr = ConfigManager()
         self.cfg = self.cfg_mgr.cfg
+        self.devices = []
         super().__init__()
 
         self.title(APP_TITLE)
@@ -712,34 +768,53 @@ class App(ctk.CTk):
         self.bind("<Control-q>", lambda event: self.quit())
         self.bind("<Control-h>", lambda event: self.show_usage())
 
-        self.focus_set()
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
 
         # Start the web server if enabled in a previous run.
         self.start_file_server()
 
-    def scan_devices(self):
-        # Initialize Zeroconf and start scanning for _netconf-ssh._tcp devices
+        # Start mDNS-SD scanning in background.
+        self.start_zeroconf_scanner()
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
+    def start_zeroconf_scanner(self):
+        """mDNS-SD scanner.  Tracks available NETCONF (XML/SSH) devices."""
+        svc = "_netconf-ssh._tcp.local."
+
         self.zeroconf = Zeroconf()
         self.listener = ZeroconfListener(self)
-        self.browser = ServiceBrowser(self.zeroconf, "_netconf-ssh._tcp.local.", self.listener)
-        self.status("Scanning for devices...")
+        self.browser = ServiceBrowser(self.zeroconf, svc,
+                                      self.listener)
+        self.status(f"mDNS-SD scanning for {svc} capable devices ...")
 
     def update_device_list(self, devices):
-        # Create a dialog to show the list of devices
-        dialog = ScanResultsDialog(self, devices)
-        self.wait_window(dialog)
-        if dialog.selected_device:
-            name, ip, port = dialog.selected_device
-            name = name.rstrip('.')
-            self.cfg['addr'] = ip
-            self.cfg['port'] = port
-            self.entries['addr'].delete(0, 'end')
-            self.entries['addr'].insert(0, ip)
-            self.entries['port'].delete(0, 'end')
-            self.entries['port'].insert(0, str(port))
-            self.status(f"using {name} ({ip}:{port})")
+        self.devices = list(devices.values())
+
+    def show_device_list(self):
+        if not self.devices:
+            messagebox.showinfo("mDNS-SD Scan Results", "No NETCONF capable devices found.")
         else:
-            self.status("canceled.")
+            dialog = ScanResultsDialog(self, self.devices)
+            self.wait_window(dialog)
+            if dialog.selected_device:
+                name, ip, port = dialog.selected_device
+                name = name.rstrip('.')
+                self.cfg['addr'] = ip
+                self.cfg['port'] = port
+                self.entries['addr'].delete(0, 'end')
+                self.entries['addr'].insert(0, ip)
+                self.entries['port'].delete(0, 'end')
+                self.entries['port'].insert(0, str(port))
+                self.status(f"Using {name} ({ip}:{port})")
+            else:
+                self.status("Cancelled.")
+
+    def scan_devices(self):
+        self.show_device_list()
 
     def select_directory(self):
         directory = filedialog.askdirectory(initialdir=self.server_path)
@@ -750,7 +825,7 @@ class App(ctk.CTk):
             self.server_path_entry.insert(0, str(self.cfg['server_path']))
             self.cfg_mgr.save()
             self.restart_file_server()
-            self.status(f"Serving files from: {self.server_path}")
+            self.status(f"HTTP server, serving files from: {self.server_path}")
 
     def get_interfaces(slf):
         interfaces = psutil.net_if_addrs()
@@ -817,7 +892,7 @@ class App(ctk.CTk):
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
-        self.status(f"Serving files on {interface}:{port}")
+        self.status(f"HTTP server, serving files on {interface}:{port}")
         return True
 
     def restart_file_server(self):
