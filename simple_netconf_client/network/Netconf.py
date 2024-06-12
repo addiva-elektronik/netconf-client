@@ -2,7 +2,6 @@ import os
 import socket
 import json
 import logging
-import customtkinter as ctk
 from ncclient import manager
 from ncclient.transport.errors import AuthenticationError, SSHError
 
