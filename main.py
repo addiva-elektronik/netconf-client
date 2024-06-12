@@ -86,7 +86,7 @@ class AboutDialog(ctk.CTkToplevel):
             "This program is available for free as\n"
             "open source under the MIT license.\n"
         )
-        label = ctk.CTkLabel(self, text=about_message, font=("Arial", 16))
+        label = ctk.CTkLabel(self, text=about_message, font=("Arial", 14))
         label.pack(padx=20, pady=20)
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
         close_button.pack(pady=10)
@@ -114,7 +114,7 @@ class LicenseDialog(ctk.CTkToplevel):
             "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
         )
         label = ctk.CTkLabel(self, text=license_message,
-                             font=("Arial", 16),
+                             font=("Arial", 14),
                              wraplength=580)
         label.pack(padx=20, pady=20)
         close_button = ctk.CTkButton(self, text="Close", command=self.destroy)
@@ -1149,7 +1149,7 @@ class App(ctk.CTk):
         AboutDialog(self, 320, 260)
 
     def show_license(self):
-        LicenseDialog(self, 720, 450)
+        LicenseDialog(self, 720, 480)
 
     def show_usage(self):
         fn = self._full_path("usage.md")
