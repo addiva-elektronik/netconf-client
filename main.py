@@ -70,7 +70,13 @@ RPC_GET_OPER = """<get-data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-nmda
     </subtree-filter>
 </get-data>
 """
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
 
+    return os.path.join(base_path, relative_path)
 
 class AboutDialog(ctk.CTkToplevel):
     def __init__(self, parent, width, height):
@@ -920,10 +926,10 @@ class App(ctk.CTk):
 
     def load_icons(self):
         self.icon_images = {
-            'save': Image.open("icons/save.png"),
-            'load': Image.open("icons/open.png"),
-            'exit': Image.open("icons/close.png"),
-            'tran': Image.open("icons/transparent.png")
+            'save': Image.open(resource_path("icons/save.png")),
+            'load': Image.open(resource_path("icons/open.png")),
+            'exit': Image.open(resource_path("icons/close.png")),
+            'tran': Image.open(resource_path("icons/transparent.png"))
         }
         self.icons = {
             'save': ImageTk.PhotoImage(self.icon_images['save']),
