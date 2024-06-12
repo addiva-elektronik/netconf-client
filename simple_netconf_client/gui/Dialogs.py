@@ -1,6 +1,7 @@
 import markdown
 import customtkinter as ctk
 from tkinterweb import HtmlFrame
+from tkinter import  END, Listbox
 from setuptools_scm import get_version
 
 class AboutDialog(ctk.CTkToplevel):
@@ -208,3 +209,48 @@ class UsageDialog(ctk.CTkToplevel):
             self.clipboard_clear()
             self.clipboard_append(url)
             self.parent.status(f"copied {url} to clipboard.")
+
+class ScanResultsDialog(ctk.CTkToplevel):
+    def __init__(self, parent, devices):
+        super().__init__(parent)
+        self.title("mDNS-SD - Select NETCONF Device")
+        self.geometry("400x300")
+        self.devices = devices
+        self.selected_device = None
+
+        self.listbox = Listbox(self)
+        self.listbox.pack(fill="both", expand=True, padx=10, pady=10)
+        self.update_listbox()
+
+        self.cancel_button = ctk.CTkButton(self, text="Cancel",
+                                           command=self.on_cancel)
+        self.cancel_button.pack(side="left", padx=10, pady=10)
+
+        self.ok_button = ctk.CTkButton(self, text="OK",
+                                       command=self.on_ok)
+        self.ok_button.pack(side="right", padx=10, pady=10)
+
+        # Allow closing with common key bindings
+        self.bind("<Control-w>", lambda event: self.destroy())
+        self.bind("<Escape>", lambda event: self.destroy())
+        # Bring frame into foreground and focus it when it becomes visible
+        self.bind("<Map>", self.on_map)
+
+    def on_map(self, event):
+        self.lift()
+        self.focus_force()
+
+    def update_listbox(self):
+        self.listbox.delete(0, END)
+        for name, ip, port in self.devices:
+            name = name.rstrip('.')
+            self.listbox.insert('end', f"{name} - {ip}:{port}")
+
+    def on_ok(self):
+        selection = self.listbox.curselection()
+        if selection:
+            self.selected_device = self.devices[selection[0]]
+        self.destroy()
+
+    def on_cancel(self):
+        self.destroy()
