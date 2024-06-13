@@ -2,7 +2,8 @@ import markdown
 import customtkinter as ctk
 from tkinterweb import HtmlFrame
 from tkinter import  END, Listbox
-from setuptools_scm import get_version
+from simple_netconf_client import get_version
+
 
 class AboutDialog(ctk.CTkToplevel):
     def __init__(self, parent, width, height):

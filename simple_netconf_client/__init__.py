@@ -2,6 +2,18 @@ import os
 import sys
 import argparse
 import logging
+from importlib.metadata import version, PackageNotFoundError
+
+
+try:
+    __version__ = version("netconf-client")
+except PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
+
+def get_version():
+    return __version__
+
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
