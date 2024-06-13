@@ -4,8 +4,11 @@ This application is a NETCONF client with a user-friendly UI, built with
 Python and customtkinter library, for interacting with NETCONF-enabled
 devices.
 
+![](img/screenshot.png)
+
 For help, see the built-in [Usage Instructions](usage.md).
 
+![](img/usage.png)
 
 ## Cloning
 
@@ -76,7 +79,7 @@ Application can be run on Windows, Linux & MacOS.
 ### Building .exe for Windows
 
 ``` 
-pyinstaller --onefile --windowed --add-data "disable-profinet.xml:." --add-data "enable-profinet.xml:." main.py
+pyinstaller main.spec
 ```
 
 ## Contributing

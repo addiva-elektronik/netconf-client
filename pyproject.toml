@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61", "setuptools_scm", "wheel"]
+requires = ["setuptools>=61", "setuptools_scm[toml]==6.3.2", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,5 +7,9 @@ name = "netconf-client"
 dynamic = ["version", "dependencies"]
 
 [tool.setuptools.dynamic]
-version = { use_scm_version = true }
 dependencies = { file = "requirements.txt" }
+
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools_scm]

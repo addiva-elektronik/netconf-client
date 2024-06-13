@@ -2,3 +2,6 @@
 *.bak
 *.xml
 *~
+__pycache__
+build
+dist
