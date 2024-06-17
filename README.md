@@ -10,19 +10,50 @@ For help, see the built-in [Usage Instructions](usage.md).
 
 ![](img/usage.png)
 
+## Requirements
+
+On Windows the standard Python installation is sufficient.  All other
+dependencies are listed in `requirements.txt`.  To fully leverage the
+command line in Windows you may want to install [Terminal 2][4] and
+[Git Bash][2].
+
+On Linux and macOS, however, your default Python3 installation may not
+have the full Python distribution.
+
+Debian/Ubuntu/Linux Mint:
+
+```bash
+~$ sudo apt-get install python3-tk
+```
+
+RedHat/Fedora:
+
+```bash
+~$ sudo dnf install python3-tkinter
+```
+
+macOS:
+
+```bash
+~$ brew install python-tk
+```
+
+
 ## Cloning
 
 Use git to clone this repository (the green <> Code button):
 
 ```bash
-git clone https://github.com/addiva-elektronik/netconf-client.git
+~$ cd src/
+~/src$ git clone https://github.com/addiva-elektronik/netconf-client.git
+~/src$ cd netconf-client/
 ```
 
 ## Setup
 
-It is recommended to use Python3 virtual environment for 3rd party
-software.  This ensures proper versions of all dependencies are used,
-without leaking over to other programs.
+It is recommended to use Python3 virtual environment (venv) for 3rd
+party software.  This ensures proper versions of all dependencies are
+used, without leaking over to other programs.
 
 Set up venv and source `activate`.  The following example works on
 Linux, verified on [Linux Mint]():
@@ -51,8 +82,9 @@ we'll now use to install the requirements:
 ...
 ```
 
-> When done, call `deactivate`, or `deactivate.bat` to "detach" from the
-> venv.
+> **TIP:** When your session with netconf-client is over, you can call
+> the `deactivate`, or `deactivate.bat` to "detach" your terminal from
+> from the venv, or just close your terminal for the same effect.
 
 #### IMPORTANT INFORMATION!
 
@@ -95,3 +127,4 @@ license.
 [1]: https://linuxmint.com/
 [2]: https://gitforwindows.org/
 [3]: https://choosealicense.com/licenses/mit/
+[4]: https://github.com/microsoft/terminal
