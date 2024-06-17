@@ -136,21 +136,24 @@ class UsageDialog(ctk.CTkToplevel):
         self.html_frame.bind_all("<Alt-Right>", self.on_forward_button)
 
         # Bind key events for scrolling and closing
-        self.html_frame.bind_all("<Up>", lambda e: self.html_frame.yview_scroll(-5, "units"))
-        self.html_frame.bind_all("<Down>", lambda e: self.html_frame.yview_scroll(5, "units"))
-        self.html_frame.bind_all("<Prior>", lambda e: self.html_frame.yview_scroll(-1, "pages"))
-        self.html_frame.bind_all("<Next>", lambda e: self.html_frame.yview_scroll(1, "pages"))
-        self.html_frame.bind_all("<Home>", lambda e: self.html_frame.yview_moveto(0))
-        self.html_frame.bind_all("<End>", lambda e: self.html_frame.yview_moveto(1))
+        self.html_frame.bind_all("<Up>", lambda event: self.html_frame.yview_scroll(-5, "units"))
+        self.html_frame.bind_all("<Down>", lambda event: self.html_frame.yview_scroll(5, "units"))
+        self.html_frame.bind_all("<Prior>", lambda event: self.html_frame.yview_scroll(-1, "pages"))
+        self.html_frame.bind_all("<Next>", lambda event: self.html_frame.yview_scroll(1, "pages"))
+        self.html_frame.bind_all("<Home>", lambda event: self.html_frame.yview_moveto(0))
+        self.html_frame.bind_all("<End>", lambda event: self.html_frame.yview_moveto(1))
         self.bind("<Control-w>", lambda event: self.destroy())
         self.bind("<Escape>", lambda event: self.destroy())
-
+        self.bind("<Tab>", lambda event: self.override_default_tab_behaviour(event))
         # Bind right-click on links to copy URL
         self.html_frame.bind("<Button-3>", self.on_right_click)
 
         # Bring frame into foreground and focus it when it becomes visible
         self.html_frame.bind("<Map>", self.on_map)
-
+    
+    def override_default_tab_behaviour(self, event):
+        return 'break'
+    
     def on_map(self, event):
         self.lift()
         self.focus_force()
