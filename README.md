@@ -111,7 +111,7 @@ Application can be run on Windows, Linux & MacOS.
 ### Building .exe for Windows
 
 ``` 
-pyinstaller main.spec
+python pyinstaller.py
 ```
 
 ## Contributing
