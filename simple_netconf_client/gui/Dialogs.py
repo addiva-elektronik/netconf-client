@@ -12,7 +12,7 @@ class AboutDialog(ctk.CTkToplevel):
         parent.center_dialog(self, width, height)
         about_message = (
             "Simple NETCONF Client\n"
-            f"v{get_version()}\n"
+            f"{get_version()}\n"
             "\n"
             "Copyright (c) 2024 Ejub Šabić et al.\n"
             "\n"

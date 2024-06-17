@@ -38,6 +38,7 @@ hiddenimports=['zeroconf._utils.ipaddress',
         ]
 
 datas=[
+        ('version.txt', '.'),
         ('disable-profinet.xml', '.'),
         ('enable-profinet.xml', '.'),
         ('icons/open.png', 'icons'),

@@ -22,3 +22,4 @@ tk==0.1.0
 tkinterweb==3.23.10
 tomli==2.0.1
 zeroconf==0.132.2
+GitPython==3.1.43

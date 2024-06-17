@@ -2,17 +2,6 @@ import os
 import sys
 import argparse
 import logging
-from importlib.metadata import version, PackageNotFoundError
-
-
-try:
-    __version__ = version("netconf-client")
-except PackageNotFoundError:
-    # package is not installed
-    __version__ = "0.0.0"
-
-def get_version():
-    return __version__
 
 def resource_path(relative_path):
     try:
@@ -34,3 +23,14 @@ def setup_logging(debug_enabled):
         logging_level = logging.INFO
 
     logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
+
+try:
+    version_file_path = resource_path('version.txt')
+    with open(version_file_path) as f:
+        __version__ = f.readlines()[0].strip()
+except Exception:
+    # package is not installed
+    __version__ = "0.0.0"
+
+def get_version():
+    return __version__
