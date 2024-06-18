@@ -7,7 +7,7 @@ import sys
 import signal
 import customtkinter as ctk
 from simple_netconf_client.gui.SimpleNetconfClient import SimpleNetconfClient
-from simple_netconf_client import parse_args, setup_logging
+from simple_netconf_client import parse_args, setup_logging, get_version
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
