@@ -78,7 +78,9 @@ class ConfigManager:
             'server_iface': 'virbr0',
             'server_enabled': False,
             'server_path': '',
-            'server_port': 8080
+            'server_port': 8080,
+            'syntax_style': 'monokai',
+            'max_highlighting_size': 500_000
         }
         self.cfg = self.default_cfg.copy()
         self.load()
