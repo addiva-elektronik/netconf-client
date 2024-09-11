@@ -442,6 +442,21 @@ class SimpleNetconfClient(ctk.CTk):
 
             self.textbox.tag_config(str(token), **kwargs)
             self.syntax_tags.append(str(token))
+
+        kwargs = {}
+        if style.background_color:
+            kwargs["fg_color"] = style.background_color
+
+        text_color = self.textbox.tag_cget("Token", "foreground")
+        if text_color:
+            kwargs["text_color"] = text_color
+
+        self.textbox.configure(**kwargs)
+
+        select_color = style.highlight_color
+        if select_color:
+            self.textbox.tag_config("sel", background=select_color)
+
         self.highlight_syntax()
         self.cfg["syntax_style"] = name
 
