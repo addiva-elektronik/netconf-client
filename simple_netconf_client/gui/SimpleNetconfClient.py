@@ -26,6 +26,7 @@ from simple_netconf_client.network.Netconf import ConfigManager, ZeroconfListene
 from pygments import lex
 from pygments.lexers.html import XmlLexer
 from pygments.styles import get_all_styles, get_style_by_name
+import time
 
 APP_TITLE = "Simple NETCONF Client"
 WELCOME = "Welcome to the NETCONF client!\n\n" \
@@ -66,6 +67,7 @@ class SimpleNetconfClient(ctk.CTk):
         self.cfg_mgr = ConfigManager()
         self.cfg = self.cfg_mgr.cfg
         self.devices = []
+        self.last_key_pressed = time.time()
         super().__init__()
 
         self.title(APP_TITLE)
@@ -484,6 +486,12 @@ class SimpleNetconfClient(ctk.CTk):
             self.textbox.mark_set("range_start", "range_end")
 
     def on_key_release(self, _):
+        current_time = time.time()
+
+        if current_time - self.last_key_pressed < 1: 
+            return
+        
+        self.last_key_pressed = current_time
         self.highlight_syntax()
 
     def on_map(self, event):
