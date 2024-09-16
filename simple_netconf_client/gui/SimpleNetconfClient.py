@@ -291,10 +291,19 @@ class SimpleNetconfClient(ctk.CTk):
         self.port_select.grid(row=3, column=0, pady=(0, 10), padx=10, sticky="ew")
         self.entries['port'] = self.port_select
 
+        self.user_label = ctk.CTkLabel(self.device_frame,
+                                       text="RPC Timeout",
+                                       font=("Arial", 8))
+        self.user_label.grid(row=4, column=0, pady=0, padx=10, sticky="w")
+
+        self.timeout_select = ctk.CTkEntry(self.device_frame, width=198)
+        self.timeout_select.grid(row=5, column=0, pady=(0, 10), padx=10, sticky="ew")
+        self.entries['timeout'] = self.timeout_select
+
         self.scan_button = ctk.CTkButton(self.device_frame, text="Find Device",
                                          width=198,
                                          command=self.scan_devices)
-        self.scan_button.grid(row=4, column=0, columnspan=2,
+        self.scan_button.grid(row=6, column=0, columnspan=2,
                               pady=(0, 10), padx=10, sticky="ew")
 
         self.creds_frame = ctk.CTkFrame(self.conn_param_frame)
@@ -319,6 +328,8 @@ class SimpleNetconfClient(ctk.CTk):
             self.entries['addr'].insert(0, self.cfg['addr'])
         if self.cfg['port']:
             self.entries['port'].insert(0, str(self.cfg['port']))
+        if self.cfg['timeout']:
+            self.entries['timeout'].insert(0, str(self.cfg['timeout']))
         if self.cfg['user']:
             self.entries['user'].insert(0, self.cfg['user'])
         if self.cfg['pass']:
@@ -909,7 +920,8 @@ class SimpleNetconfClient(ctk.CTk):
     # CONNECTION PARAMETERS METHODS
     def save_params(self):
         if self.address.get() == "" or self.port_select.get() == "" \
-           or self.username.get() == "" or self.password.get() == "":
+           or self.timeout_select.get() == "" or self.username.get() == "" \
+           or self.password.get() == "":
             self.error("Connection parameters cannot be empty!")
             return
 
@@ -917,8 +929,12 @@ class SimpleNetconfClient(ctk.CTk):
             self.error("Port must be in range 0-65535")
             return
 
+        if not self.is_timeout_valid():
+            self.error("RPC timeout must be a positive number")
+
         self.cfg['addr'] = self.address.get()
         self.cfg['port'] = self.port_select.get()
+        self.cfg['timeout'] = self.timeout_select.get()
         self.cfg['user'] = self.username.get()
         self.cfg['pass'] = self.password.get()
         self.cfg['ssh-agent'] = self.ssh_agent.get()
@@ -936,9 +952,20 @@ class SimpleNetconfClient(ctk.CTk):
         except Exception:
             return False
 
+    def is_timeout_valid(self):
+        try:
+            timeout_num = int(self.timeout_select.get())
+            if 0 < timeout_num:
+                return True
+            else:
+                return False
+        except Exception:
+            return False
+
     def is_empty_connection_parameters(self):
         if self.cfg['addr'] == "" or self.cfg['port'] == "" \
-           or self.cfg['user'] == "" or self.cfg['pass'] == "":
+           or self.cfg['timeout'] == "" or self.cfg['user'] == "" \
+           or self.cfg['pass'] == "":
             return True
         return False
 

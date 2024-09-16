@@ -15,6 +15,7 @@ class NetconfConnection:
         try:
             host = self.cfg['addr']
             port = self.cfg['port']
+            timeout = self.cfg['timeout']
             self.app.status(f"Connecting to {host} port {port}, please wait ...")
             self.manager = manager.connect(host=host,
                                            port=port,
@@ -22,7 +23,7 @@ class NetconfConnection:
                                            password=self.cfg['pass'],
                                            hostkey_verify=False,
                                            allow_agent=self.cfg['ssh-agent'],
-                                           timeout=30)
+                                           timeout=timeout)
             logging.info("Connected to NETCONF server %s.", host)
             return self.manager
         except AuthenticationError as err:
@@ -70,6 +71,7 @@ class ConfigManager:
         self.default_cfg = {
             'addr': '',
             'port': 830,
+            'timeout': 30,
             'user': "admin",
             'pass': '',
             'ssh-agent': True,
