@@ -23,6 +23,9 @@ from xml.dom.minidom import parseString
 from simple_netconf_client import resource_path
 from simple_netconf_client.gui.Dialogs import LicenseDialog, UsageDialog, AboutDialog, ScanResultsDialog
 from simple_netconf_client.network.Netconf import ConfigManager, ZeroconfListener, NetconfConnection
+from pygments import lex
+from pygments.lexers.html import XmlLexer
+from pygments.styles import get_all_styles, get_style_by_name
 
 APP_TITLE = "Simple NETCONF Client"
 WELCOME = "Welcome to the NETCONF client!\n\n" \
@@ -87,6 +90,12 @@ class SimpleNetconfClient(ctk.CTk):
         self.settings_menu = Menu(self.menubar, tearoff=0)
         self.file_menu = Menu(self.menubar, tearoff=0)
         self.help_menu = Menu(self.menubar, tearoff=0)
+        self.syntax_menu = Menu(self.settings_menu, tearoff=0)
+        for style in get_all_styles():
+            self.syntax_menu.add_command(
+                label=style,
+                command=functools.partial(self.load_syntax_style, style),
+            )
 
         self.settings_menu.add_radiobutton(label="System", variable=self.theme_var,
                                            command=lambda: self.change_theme_mode_event("System"))
@@ -94,6 +103,9 @@ class SimpleNetconfClient(ctk.CTk):
                                            command=lambda: self.change_theme_mode_event("Light"))
         self.settings_menu.add_radiobutton(label="Dark", variable=self.theme_var,
                                            command=lambda: self.change_theme_mode_event("Dark"))
+        self.settings_menu.add_cascade(
+            label="Syntax Style", menu=self.syntax_menu
+        )
 
         self.settings_menu.add_separator()
 
@@ -410,6 +422,70 @@ class SimpleNetconfClient(ctk.CTk):
         # Start mDNS-SD scanning in background.
         self.start_zeroconf_scanner()
 
+        # Setup syntax highlighter
+        self.lexer = XmlLexer()
+        self.load_syntax_style(self.cfg.get("syntax_style", "monokai"))
+        self.textbox.bind("<KeyRelease>", self.on_key_release)
+
+    def load_syntax_style(self, name):
+        self.syntax_tags = []
+        style = get_style_by_name(name)
+
+        for token, opts in style.list_styles():
+            kwargs = {}
+            if opts.get("color", None):
+                kwargs["foreground"] = "#" + opts["color"]
+            if opts.get("bgcolor", None):
+                kwargs["background"] = "#" + opts["bgcolor"]
+            if opts.get("underline", None):
+                kwargs["underline"] = opts["underline"]
+
+            self.textbox.tag_config(str(token), **kwargs)
+            self.syntax_tags.append(str(token))
+
+        kwargs = {}
+        if style.background_color:
+            kwargs["fg_color"] = style.background_color
+
+        text_color = self.textbox.tag_cget("Token", "foreground")
+        if text_color:
+            kwargs["text_color"] = text_color
+
+        self.textbox.configure(**kwargs)
+
+        select_color = style.highlight_color
+        if select_color:
+            self.textbox.tag_config("sel", background=select_color)
+
+        self.highlight_syntax()
+        self.cfg["syntax_style"] = name
+
+    def highlight_syntax(self):
+        start = "1.0"
+        data = self.textbox.get(start, END)
+        data_size = len(data)
+        if data_size > self.cfg["max_highlighting_size"]:
+            return
+
+        while data and data[0] == '\n':
+            start = self.textbox.index('%s+1c' % start)
+            data = data[1:]
+        self.textbox.mark_set('range_start', start)
+
+        for t in self.syntax_tags:
+            self.textbox.tag_remove(
+                t, start, "range_start +%ic" % len(data)
+            )
+
+        for token, content in lex(data, self.lexer):
+            self.textbox.mark_set("range_end", f"range_start + {len(content)}c")
+            for t in token.split():
+                self.textbox.tag_add(str(t), "range_start", "range_end")
+            self.textbox.mark_set("range_start", "range_end")
+
+    def on_key_release(self, _):
+        self.highlight_syntax()
+
     def on_map(self, event):
         self.lift()
         self.focus_force()
@@ -723,6 +799,7 @@ class SimpleNetconfClient(ctk.CTk):
     def show(self, text):
         self.clear()
         self.textbox.insert("0.0", text)
+        self.highlight_syntax()
 
     def open_input_dialog_event(self):
         dialog = ctk.CTkInputDialog(text="Type in a number:",
