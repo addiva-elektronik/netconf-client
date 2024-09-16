@@ -67,7 +67,7 @@ class SimpleNetconfClient(ctk.CTk):
         self.cfg_mgr = ConfigManager()
         self.cfg = self.cfg_mgr.cfg
         self.devices = []
-        self.last_key_pressed = time.time()
+        self.debouncer_id = None
         super().__init__()
 
         self.title(APP_TITLE)
@@ -473,7 +473,7 @@ class SimpleNetconfClient(ctk.CTk):
         self.highlight_syntax()
         self.cfg["syntax_style"] = name
 
-    def highlight_syntax(self):
+    def highlight_syntax(self,event=None):
         start = "1.0"
         data = self.textbox.get(start, END)
         data_size = len(data)
@@ -497,13 +497,10 @@ class SimpleNetconfClient(ctk.CTk):
             self.textbox.mark_set("range_start", "range_end")
 
     def on_key_release(self, _):
-        current_time = time.time()
+        if self.debouncer_id is not None:
+            self.after_cancel(self.debouncer_id)
 
-        if current_time - self.last_key_pressed < 1: 
-            return
-        
-        self.last_key_pressed = current_time
-        self.highlight_syntax()
+        self.debouncer_id = self.after(500, self.highlight_syntax, _)
 
     def on_map(self, event):
         self.lift()
